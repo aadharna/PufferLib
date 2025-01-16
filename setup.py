@@ -355,7 +355,7 @@ setup(
        #compiler_directives={'profile': True},# annotate=True
     ),
     include_dirs=[numpy.get_include(), RAYLIB_INCLUDE],
-    python_requires=">=3.9",
+    python_requires=">=3.8",
     license="MIT",
     author="Joseph Suarez",
     author_email="jsuarez@puffer.ai",

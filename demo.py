@@ -6,6 +6,10 @@ import uuid
 import ast
 import os
 
+import isaacgym  # noqa
+from isaacgym import gymapi
+from isaacgym import gymutil
+
 import pufferlib
 import pufferlib.utils
 import pufferlib.vector
