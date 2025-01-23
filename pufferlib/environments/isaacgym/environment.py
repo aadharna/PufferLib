@@ -206,9 +206,9 @@ class IsaacEnv:
             self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
     def step(self):
-        self.render()
-        #for i in range(self.control_freq_inv):
-        #    self.gym.simulate(self.sim)
+        #self.render()
+        for i in range(self.control_freq_inv):
+            self.gym.simulate(self.sim)
 
         # to fix!
         if self.device == "cpu":
@@ -538,14 +538,14 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         #self._compute_observations(env_ids)
 
     def step(self, actions):
-        #self.actions = actions.to(self.device).clone()
-        #pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
-        #self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
+        self.actions = actions.to(self.device).clone()
+        pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
+        self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
 
         self.env.step()
 
-        #self.progress_buf += 1
-        #self._refresh_sim_tensors()
+        self.progress_buf += 1
+        self._refresh_sim_tensors()
 
         '''
         self._compute_observations()
@@ -580,7 +580,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
 
     def render(self, sync_frame_time=False):
         if not self.viewer:
-            super().render(sync_frame_time)
+            self.env.render()
             return
 
         self.gym.refresh_actor_root_state_tensor(self.sim)
@@ -603,7 +603,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         # new_cam_target = gymapi.Vec3(0, 0.5, 1.0)
         # new_cam_pos = gymapi.Vec3(1, -1, 1.6)
         # self.gym.viewer_camera_look_at(self.viewer, None, new_cam_pos, new_cam_target)
-        super().render(sync_frame_time)
+        self.env.render()
 
 def compute_obj_observations(root_states, tar_states):
     # type: (Tensor, Tensor) -> Tensor
