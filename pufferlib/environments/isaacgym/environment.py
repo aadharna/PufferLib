@@ -206,9 +206,9 @@ class IsaacEnv:
             self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
     def step(self):
-        for i in range(self.control_freq_inv):
-            self.render()
-            self.gym.simulate(self.sim)
+        self.render()
+        #for i in range(self.control_freq_inv):
+        #    self.gym.simulate(self.sim)
 
         # to fix!
         if self.device == "cpu":
@@ -366,7 +366,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self._initial_dof_vel = torch.zeros_like(
             self._dof_vel, device=device, dtype=torch.float)
 
-        self._sensor_tensor = gymtorch.wrap_tensor(self.gym.acquire_force_sensor_tensor(self.sim))
+        #self._sensor_tensor = gymtorch.wrap_tensor(self.gym.acquire_force_sensor_tensor(self.sim))
 
         self._rigid_body_state = gymtorch.wrap_tensor(self.gym.acquire_rigid_body_state_tensor(self.sim))
         bodies_per_env = self._rigid_body_state.shape[0] // self.num_envs
@@ -389,6 +389,20 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             self._termination_heights, device=device
         )
 
+        # TODO: Why is this too small?
+        '''
+        self._target_states = self._root_states.view(
+            self.num_envs, num_actors, self._root_states.shape[-1]
+        )[..., 1, :]
+
+        self._tar_actor_ids = (
+            to_torch(
+                num_actors * np.arange(self.num_envs), device=self.device, dtype=torch.int32
+            )
+            + 1
+        )
+        '''
+
         key_bodies = ["Head", "L_Knee", "R_Knee", "L_Elbow", "R_Elbow", "L_Ankle", "R_Ankle", "L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"] 
         obj_obs_size = 15
         self.ref_hoi_obs_size = 324 + len(key_bodies) * 3
@@ -396,13 +410,14 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             shape=(1 + (52) * (3 + 6 + 3 + 3) - 3 + 10 * 3 + obj_obs_size + self.ref_hoi_obs_size,),
             dtype=np.float32
         )
-        self.single_action_space = gym.spaces.Box(low=-np.inf, high=np.inf,
+        self.single_action_space = gym.spaces.Box(low=-1, high=1,
                 shape=(51*3,), dtype=np.float32)
         self.num_agents = num_envs
-        super().__init__(buf)
+        super().__init__(buf=buf)
 
         humanoid_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+        dof_num = self.gym.get_asset_dof_count(humanoid_asset)
 
 
         '''
@@ -431,8 +446,6 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         body_ids = []
         for body_name in self.contact_bodies:
             body_id = self.gym.find_actor_rigid_body_handle(env_ptr, actor_handle, body_name)
-            if body_id == -1:
-                breakpoint()
             assert body_id != -1
             body_ids.append(body_id)
 
@@ -456,7 +469,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
-        self.gym.refresh_force_sensor_tensor(self.sim)
+        #self.gym.refresh_force_sensor_tensor(self.sim)
         self.gym.refresh_dof_force_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
@@ -482,17 +495,18 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
 
         # Compute task obs
         root_states = self._humanoid_root_states[env_ids]
-        tar_states = self._target_states[env_ids]
-        task_obs = compute_obj_observations(root_states, tar_states)
+        #tar_states = self._target_states[env_ids]
+        #task_obs = compute_obj_observations(root_states, tar_states)
 
         # Joint observations
-        obs = torch.cat([humanoid_obs, task_obs], dim=-1)
+        #obs = torch.cat([humanoid_obs, task_obs], dim=-1)
+        obs = torch.cat([humanoid_obs], dim=-1)
 
-        ts = self.progress_buf[env_ids].clone()
-        self._curr_ref_obs[env_ids] = self.hoi_data_dict[0]["hoi_data"][ts].clone()
-        next_ts = torch.clamp(ts + 1, max=self.max_episode_length - 1)
-        ref_obs = self.hoi_data_dict[0]["hoi_data"][next_ts].clone()
-        self.obs_buf[env_ids] = torch.cat((obs, ref_obs), dim=-1)
+        #ts = self.progress_buf[env_ids].clone()
+        #self._curr_ref_obs[env_ids] = self.hoi_data_dict[0]["hoi_data"][ts].clone()
+        #next_ts = torch.clamp(ts + 1, max=self.max_episode_length - 1)
+        #ref_obs = self.hoi_data_dict[0]["hoi_data"][next_ts].clone()
+        #self.obs_buf[env_ids] = torch.cat((obs, ref_obs), dim=-1)
 
     def reset(self, env_ids=slice(None)):
         if env_ids != slice(None) and len(env_ids) == 0:
@@ -517,22 +531,23 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             gymtorch.unwrap_tensor(env_ids_int32),
             len(env_ids_int32),
         )
-        self.progress_buf[env_ids] = self.motion_times.clone()
-        self.reset_buf[env_ids] = 0
-        self._terminate_buf[env_ids] = 0
+        #self.progress_buf[env_ids] = self.motion_times.clone()
+        #self.reset_buf[env_ids] = 0
+        #self._terminate_buf[env_ids] = 0
         self._refresh_sim_tensors()
-        self._compute_observations(env_ids)
+        #self._compute_observations(env_ids)
 
     def step(self, actions):
-        self.actions = actions.to(self.device).clone()
-        pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
-        self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
+        #self.actions = actions.to(self.device).clone()
+        #pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
+        #self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
 
         self.env.step()
 
-        self.progress_buf += 1
-        self._refresh_sim_tensors()
+        #self.progress_buf += 1
+        #self._refresh_sim_tensors()
 
+        '''
         self._compute_observations()
         self.rew_buf[:] = compute_humanoid_reward(
             self._curr_ref_obs,
@@ -555,6 +570,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             self._curr_obs,
         )
         self.extras["terminate"] = self._terminate_buf
+        '''
 
         # debug viz
         if self.viewer and self.debug_viz:
