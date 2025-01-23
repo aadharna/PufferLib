@@ -12,7 +12,7 @@ from isaacgym import gymtorch
 from isaacgym import gymutil
 from isaacgym.torch_utils import (
     quat_rotate, quat_mul, quat_from_angle_axis, normalize_angle,
-    quat_from_euler_xyz, quat_to_tan_norm, get_axis_params
+    quat_from_euler_xyz, get_axis_params
 )
 
 import torch
@@ -93,7 +93,6 @@ class IsaacSMPLXHumanoid(pufferlib.PufferEnv):
         self.single_action_space = env.single_action_space
         self.num_agents = env.num_envs
         self.log_interval = log_interval
-        super().__init__(buf)
 
         # WARNING: ONLY works with native vec. Will break in multiprocessing
         device = torch.device("cuda" if env.use_gpu else "cpu")
@@ -132,14 +131,15 @@ class IsaacSMPLXHumanoid(pufferlib.PufferEnv):
 
 # Base class for RL tasks
 class IsaacEnv:
-    def __init__(self, control_freq_inv, headless, device,
-            physics_engine, graphics_disable_camera_sensors):
+    def __init__(self, control_freq_inv=2, headless=True, device='cuda',
+            physics_engine=gymapi.SIM_PHYSX, graphics_disable_camera_sensors=False):
         self.gym = gymapi.acquire_gym()
         self.control_freq_inv = control_freq_inv
         self.headless = headless
         self.device = device
 
-        graphics_device = -1 if (not graphics_disable_camera_sensors and headless) else device
+        compute_device = -1 if 'cuda' not in device else 0
+        graphics_device = -1 if (not graphics_disable_camera_sensors and headless) else 0
 
         # Sim params
         sim_params = gymapi.SimParams()
@@ -169,7 +169,7 @@ class IsaacEnv:
         sim_params.physx.num_subscenes = 0
 
         sim_params.flex.num_inner_iterations = 10
-        sim_params.flex.warmstart = 0.25
+        sim_params.flex.warm_start = 0.25
 
         sim_params.up_axis = gymapi.UP_AXIS_Z
         sim_params.gravity.x = 0
@@ -177,12 +177,11 @@ class IsaacEnv:
         sim_params.gravity.z = -9.81
 
         # create envs, sim and viewer
-        self.sim = self.gym.create_sim(device, graphics_device, physics_engine, sim_params)
+        self.sim = self.gym.create_sim(compute_device, graphics_device, physics_engine, sim_params)
         if self.sim is None:
             print("*** Failed to create sim")
             quit()
 
-        self.gym.prepare_sim(self.sim)
         self.enable_viewer_sync = True
         self.viewer = None
 
@@ -206,7 +205,7 @@ class IsaacEnv:
 
             self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
-    def step(self, actions):
+    def step(self):
         for i in range(self.control_freq_inv):
             self.render()
             self.gym.simulate(self.sim)
@@ -242,14 +241,16 @@ class IsaacEnv:
             self.gym.poll_viewer_events(self.viewer)
 
 class HumanoidSMPLX(pufferlib.PufferEnv):
-    def __init__(self, control_freq_inv=2, headless=True, device='cuda',
+    def __init__(self, num_envs=8, control_freq_inv=2, headless=True, device='cuda',
             physics_engine=gymapi.SIM_PHYSX, graphics_disable_camera_sensors=False,
-            smplx_capsule_path="resources/smplx/smplx_capsule.xml", spacing=5
+            smplx_capsule_path="resources/smplx_capsule.xml", spacing=5, buf=None
         ):
-
         self.env = IsaacEnv(control_freq_inv, headless, device,
             gymapi.SIM_PHYSX, graphics_disable_camera_sensors)
         self.viewer = self.env.viewer
+        self.gym = self.env.gym
+        self.sim = self.env.sim
+        self.device = device
 
         ### Create ground plane
         plane_params = gymapi.PlaneParams()
@@ -281,7 +282,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         ### Create envs
         self.envs = []
         self.humanoid_handles = []
-        num_envs = self.num_envs
+        self.num_envs = num_envs
         num_per_row = int(np.sqrt(self.num_envs))
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
@@ -299,7 +300,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
             humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset,
-                start_pose, "humanoid", group=env_id, filter=0, segmentationID=0)
+                start_pose, "humanoid", group=env_id, filter=0, segmentationId=0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, humanoid_handle)
 
             for j in range(self.num_bodies):
@@ -326,19 +327,23 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
                 self.dof_limits_lower.append(dof_prop["lower"][j])
                 self.dof_limits_upper.append(dof_prop["upper"][j])
 
-        self.dof_limits_lower = to_torch(self.dof_limits_lower, device=self.device)
-        self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
+        self.dof_limits_lower = to_torch(self.dof_limits_lower, device=device)
+        self.dof_limits_upper = to_torch(self.dof_limits_upper, device=device)
 
         ### Build PD action offset and scale
         lim_low = self.dof_limits_lower.cpu().numpy()
         lim_high = self.dof_limits_upper.cpu().numpy()
         self._pd_action_offset = 0.5 * (lim_high + lim_low)
         self._pd_action_scale = 0.5 * (lim_high - lim_low)
-        self._pd_action_offset = to_torch(self._pd_action_offset, device=self.device)
-        self._pd_action_scale = to_torch(self._pd_action_scale, device=self.device)
+        self._pd_action_offset = to_torch(self._pd_action_offset, device=device)
+        self._pd_action_scale = to_torch(self._pd_action_scale, device=device)
 
-        self.contact_bodies = ["right_foot", "left_foot"] 
+        # Feet?
+        self.contact_bodies = ["Head"] 
         self.debug_viz = False
+
+        # Initialize the sim now
+        self.gym.prepare_sim(self.sim)
 
         # get gym GPU state tensors
         self._root_states = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim))
@@ -349,7 +354,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self._initial_humanoid_root_states = self._humanoid_root_states.clone()
         self._initial_humanoid_root_states[:, 7:13] = 0
         self._humanoid_actor_ids = num_actors * torch.arange(
-            self.num_envs, device=self.device, dtype=torch.int32
+            self.num_envs, device=device, dtype=torch.int32
         )
 
         self._dof_state = gymtorch.wrap_tensor(self.gym.acquire_dof_state_tensor(self.sim))
@@ -357,19 +362,19 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self._dof_pos = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., : self.num_dof, 0]
         self._dof_vel = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., : self.num_dof, 1]
         self._initial_dof_pos = torch.zeros_like(
-            self._dof_pos, device=self.device, dtype=torch.float)
+            self._dof_pos, device=device, dtype=torch.float)
         self._initial_dof_vel = torch.zeros_like(
-            self._dof_vel, device=self.device, dtype=torch.float)
+            self._dof_vel, device=device, dtype=torch.float)
 
         self._sensor_tensor = gymtorch.wrap_tensor(self.gym.acquire_force_sensor_tensor(self.sim))
 
         self._rigid_body_state = gymtorch.wrap_tensor(self.gym.acquire_rigid_body_state_tensor(self.sim))
+        bodies_per_env = self._rigid_body_state.shape[0] // self.num_envs
         rigid_body_state_reshaped = self._rigid_body_state.view(self.num_envs, bodies_per_env, 13)
         self._rigid_body_pos = rigid_body_state_reshaped[..., : self.num_bodies, 0:3]
         self._rigid_body_rot = rigid_body_state_reshaped[..., : self.num_bodies, 3:7]
         self._rigid_body_vel = rigid_body_state_reshaped[..., : self.num_bodies, 7:10]
         self._rigid_body_ang_vel = rigid_body_state_reshaped[..., : self.num_bodies, 10:13]
-        bodies_per_env = self._rigid_body_state.shape[0] // self.num_envs
 
         self._contact_forces = gymtorch.wrap_tensor(
             self.gym.acquire_net_contact_force_tensor(self.sim)
@@ -378,20 +383,36 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             self.gym.acquire_dof_force_tensor(self.sim)
         ).view(self.num_envs, self.num_dof)
 
-        self._terminate_buf = torch.ones(self.num_envs, device=self.device, dtype=torch.long)
+        self._terminate_buf = torch.ones(self.num_envs, device=device, dtype=torch.long)
         self._termination_heights = 0.3
         self._termination_heights = to_torch(
-            self._termination_heights, device=self.device
+            self._termination_heights, device=device
         )
 
         key_bodies = ["Head", "L_Knee", "R_Knee", "L_Elbow", "R_Elbow", "L_Ankle", "R_Ankle", "L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"] 
         obj_obs_size = 15
         self.ref_hoi_obs_size = 324 + len(key_bodies) * 3
-        self.single_observation_space = pufferlib.spaces.Box(
-            (1 + (52) * (3 + 6 + 3 + 3) - 3 + 10 * 3 + obj_obs_size + self.ref_hoi_obs_size,),
+        self.single_observation_space = gym.spaces.Box(low=-np.inf, high=np.inf,
+            shape=(1 + (52) * (3 + 6 + 3 + 3) - 3 + 10 * 3 + obj_obs_size + self.ref_hoi_obs_size,),
             dtype=np.float32
         )
-        self.single_action_space = pufferlib.spaces.Box((51*3,), dtype=np.float32)
+        self.single_action_space = gym.spaces.Box(low=-np.inf, high=np.inf,
+                shape=(51*3,), dtype=np.float32)
+        self.num_agents = num_envs
+        super().__init__(buf)
+
+        humanoid_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+        num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
+
+
+        '''
+        # Check if body names are valid
+        for body_name in key_bodies:
+            body_id = self.gym.find_asset_rigid_body_index(humanoid_asset, body_name)
+            print(f"Body name: {body_name}, body_id: {body_id}")
+            if body_id == -1:
+                print(f"Warning: Body '{body_name}' not found in the asset!")
+        '''
 
         # Key body ids
         env_ptr = self.envs[0]
@@ -402,7 +423,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             assert body_id != -1
             body_ids.append(body_id)
 
-        self._key_body_ids = to_torch(body_ids, device=self.device, dtype=torch.long)
+        self._key_body_ids = to_torch(body_ids, device=device, dtype=torch.long)
 
         # Contact body ids
         env_ptr = self.envs[0]
@@ -410,10 +431,15 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         body_ids = []
         for body_name in self.contact_bodies:
             body_id = self.gym.find_actor_rigid_body_handle(env_ptr, actor_handle, body_name)
+            if body_id == -1:
+                breakpoint()
             assert body_id != -1
             body_ids.append(body_id)
 
-        self._contact_body_ids = to_torch(body_ids, device=self.device, dtype=torch.long)
+        self._contact_body_ids = to_torch(body_ids, device=device, dtype=torch.long)
+
+        # Buffers
+        self.progress_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
 
         if self.viewer is None:
             return
@@ -424,6 +450,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], self._cam_prev_char_pos[1] - 3.0, 1.0)
         cam_target = gymapi.Vec3(self._cam_prev_char_pos[0], self._cam_prev_char_pos[1], 1.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+
 
     def _refresh_sim_tensors(self):
         self.gym.refresh_dof_state_tensor(self.sim)
@@ -498,16 +525,13 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
 
     def step(self, actions):
         self.actions = actions.to(self.device).clone()
-        pd_tar_tensor = gymtorch.unwrap_tensor(self.pd_action_offset + self.pd_action_scale*self.actions)
+        pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
         self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
 
-        self.env.step_physics()
+        self.env.step()
 
         self.progress_buf += 1
         self._refresh_sim_tensors()
-
-        # extra calc of self._curr_hoi_obs_buf, for correct calculate of imitation reward
-        self._compute_hoi_observations()
 
         self._compute_observations()
         self.rew_buf[:] = compute_humanoid_reward(
