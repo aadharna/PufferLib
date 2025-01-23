@@ -1,0 +1,5 @@
+apt-get install -y --no-install-recommends vulkan-tools mesa-vulkan-drivers libegl1
+rm /usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0 /usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0.0.0 /usr/share/glvnd/egl_vendor.d/50_mesa.json
+cp docker/nvidia_icd.json /usr/share/vulkan/icd.d/nvidia_icd.json
+cp docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+export NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=all
