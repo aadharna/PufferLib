@@ -18,9 +18,7 @@ from isaacgym.torch_utils import (
 
 import torch
 
-import pufferlib.emulation
-import pufferlib.environments
-import pufferlib.postprocess
+import pufferlib
 
 
 def env_creator(name='ase'):
@@ -244,7 +242,7 @@ class IsaacEnv:
 class HumanoidSMPLX(pufferlib.PufferEnv):
     def __init__(self, num_envs=8, control_freq_inv=2, headless=True, device='cuda',
             physics_engine=gymapi.SIM_PHYSX, graphics_disable_camera_sensors=False,
-            smplx_capsule_path="resources/smplx_capsule.xml", spacing=5, buf=None
+            smpl_humanoid_path="resources/smpl_humanoid.xml", spacing=5, buf=None
         ):
         self.env = IsaacEnv(control_freq_inv, headless, device,
             gymapi.SIM_PHYSX, graphics_disable_camera_sensors)
@@ -262,8 +260,8 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self.gym.add_ground(self.sim, plane_params)
 
         ### Load humanoid asset
-        asset_root = os.path.dirname(smplx_capsule_path)
-        asset_file = os.path.basename(smplx_capsule_path)
+        asset_root = os.path.dirname(smpl_humanoid_path)
+        asset_file = os.path.basename(smpl_humanoid_path)
         asset_options = gymapi.AssetOptions()
         asset_options.angular_damping = 0.01
         asset_options.max_angular_velocity = 100.0
@@ -275,33 +273,40 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
 
         # create force sensors at the feet
         sensor_pose = gymapi.Transform()
-        right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "right_foot")
-        left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "left_foot")
+        right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "R_Ankle")
+        left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, "L_Ankle")
         self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
         self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
 
         ### Create envs
         self.envs = []
         self.humanoid_handles = []
+        num_actors = num_envs
+        num_envs = 1
         self.num_envs = num_envs
         num_per_row = int(np.sqrt(self.num_envs))
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
         max_agg_bodies = self.num_bodies + 2
         max_agg_shapes = self.num_shapes + 2
-        for env_id in range(self.num_envs):
-            # create env instance
-            env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
-            self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
 
+        # create env instance
+        env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
+        self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
+
+        # You get a small perf boost (~4%) by putting all the actors in the same env
+        for actor_id in range(num_actors):
             ### Build env
             char_h = 0.89
             start_pose = gymapi.Transform()
-            start_pose.p = gymapi.Vec3(*get_axis_params(char_h, 2))
+            row = actor_id // int(np.sqrt(num_actors))
+            col = actor_id % int(np.sqrt(num_actors))
+            start_pose.p = gymapi.Vec3(row * spacing, col * spacing, char_h)
+            #start_pose.p = gymapi.Vec3(*get_axis_params(char_h, 2))
             start_pose.r = gymapi.Quat.from_euler_zyx(math.pi / 2, 0, 0)
 
             humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset,
-                start_pose, "humanoid", group=env_id, filter=0, segmentationId=0)
+                start_pose, f"humanoid_{actor_id}", group=0, filter=1, segmentationId=0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, humanoid_handle)
 
             #gymapi.Vec3(0.54, 0.85, 0.2)
@@ -311,15 +316,16 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
 
             dof_prop = self.gym.get_asset_dof_properties(humanoid_asset)
             dof_prop["driveMode"] = gymapi.DOF_MODE_POS
+            dof_prop["stiffness"] = 1000
+            dof_prop["damping"] = 200
             self.gym.set_actor_dof_properties(env_ptr, humanoid_handle, dof_prop)
             self.humanoid_handles.append(humanoid_handle)
 
-            self.gym.end_aggregate(env_ptr)
-            self.envs.append(env_ptr)
+        self.gym.end_aggregate(env_ptr)
+        self.envs.append(env_ptr)
 
         self.dof_limits_lower = []
         self.dof_limits_upper = []
-        dof_prop = self.gym.get_actor_dof_properties(self.envs[0], self.humanoid_handles[0])
         for j in range(self.num_dof):
             if dof_prop["lower"][j] > dof_prop["upper"][j]:
                 self.dof_limits_lower.append(dof_prop["upper"][j])
@@ -328,10 +334,23 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
                 self.dof_limits_lower.append(dof_prop["lower"][j])
                 self.dof_limits_upper.append(dof_prop["upper"][j])
 
+            '''
+            dof_name = self.gym.get_asset_dof_name(humanoid_asset, j)
+            if ('Thumb' in dof_name or 'Index' in dof_name or 'Middle' in dof_name
+                    or 'Ring' in dof_name or 'Pinky' in dof_name):
+                dof_prop["driveMode"][j] = gymapi.DOF_MODE_NONE  # Disable the DOF
+                dof_prop["stiffness"][j] = 0.0  # Remove stiffness
+                dof_prop["damping"][j] = 0.0  # Remove damping
+            '''
+
         self.dof_limits_lower = to_torch(self.dof_limits_lower, device=device)
         self.dof_limits_upper = to_torch(self.dof_limits_upper, device=device)
+        self.gym.set_actor_dof_properties(env_ptr, humanoid_handle, dof_prop)
+
 
         ### Build PD action offset and scale
+        #self._build_pd_action_offset_scale()
+
         lim_low = self.dof_limits_lower.cpu().numpy()
         lim_high = self.dof_limits_upper.cpu().numpy()
         self._pd_action_offset = 0.5 * (lim_high + lim_low)
@@ -339,8 +358,9 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self._pd_action_offset = to_torch(self._pd_action_offset, device=device)
         self._pd_action_scale = to_torch(self._pd_action_scale, device=device)
 
-        # Feet?
-        self.contact_bodies = ["L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"]
+        self.contact_bodies = []#"L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"]
+        contact_bodies: ["R_Ankle", "L_Ankle", "R_Toe", "L_Toe"]
+        self.dof_bodies = []
         self.debug_viz = False
 
         # Initialize the sim now
@@ -349,47 +369,31 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         # get gym GPU state tensors
         self._refresh_sim_tensors()
         self._root_states = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim))
-        num_actors = self._root_states.shape[0] // self.num_envs
-        self._humanoid_root_states = self._root_states.view(
-            self.num_envs, num_actors, self._root_states.shape[-1]
-        )[..., 0, :]
-        self._initial_humanoid_root_states = self._humanoid_root_states.clone()
-        self._initial_humanoid_root_states[:, 7:13] = 0
-        self._humanoid_actor_ids = num_actors * torch.arange(
-            self.num_envs, device=device, dtype=torch.int32
-        )
+        self._initial_root_states = self._root_states.clone()
+        self._initial_root_states[:, 7:13] = 0 # ???
+        self._actor_ids = torch.arange(num_actors, device=device, dtype=torch.int32)
 
         self._dof_state = gymtorch.wrap_tensor(self.gym.acquire_dof_state_tensor(self.sim))
-        dofs_per_env = self._dof_state.shape[0] // self.num_envs
-        self._dof_pos = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., : self.num_dof, 0]
-        self._dof_vel = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., : self.num_dof, 1]
-        self._initial_dof_pos = torch.zeros_like(
-            self._dof_pos, device=device, dtype=torch.float)
-        self._initial_dof_vel = torch.zeros_like(
-            self._dof_vel, device=device, dtype=torch.float)
-
-        #self._sensor_tensor = gymtorch.wrap_tensor(self.gym.acquire_force_sensor_tensor(self.sim))
+        dof_view = self._dof_state.view(num_actors, self.num_dof, 2)
+        self._dof_pos = dof_view[:, :, 0]
+        self._dof_vel = dof_view[:, :, 1]
+        self._initial_dof_pos = torch.zeros_like(self._dof_pos, device=device, dtype=torch.float)
+        self._initial_dof_vel = torch.zeros_like(self._dof_vel, device=device, dtype=torch.float)
 
         self._rigid_body_state = gymtorch.wrap_tensor(self.gym.acquire_rigid_body_state_tensor(self.sim))
-        bodies_per_env = self._rigid_body_state.shape[0] // self.num_envs
-        rigid_body_state_reshaped = self._rigid_body_state.view(self.num_envs, bodies_per_env, 13)
-        self._rigid_body_pos = rigid_body_state_reshaped[..., : self.num_bodies, 0:3]
-        self._rigid_body_rot = rigid_body_state_reshaped[..., : self.num_bodies, 3:7]
-        self._rigid_body_vel = rigid_body_state_reshaped[..., : self.num_bodies, 7:10]
-        self._rigid_body_ang_vel = rigid_body_state_reshaped[..., : self.num_bodies, 10:13]
+        rigid_body_view = self._rigid_body_state.view(num_actors, self.num_bodies, 13)
+        self._rigid_body_pos = rigid_body_view[:, :, 0:3]
+        self._rigid_body_rot = rigid_body_view[:, :, 3:7]
+        self._rigid_body_vel = rigid_body_view[:, :, 7:10]
+        self._rigid_body_ang_vel = rigid_body_view[:, :, 7:10]
 
-        self._contact_forces = gymtorch.wrap_tensor(
-            self.gym.acquire_net_contact_force_tensor(self.sim)
-        ).view(self.num_envs, bodies_per_env, 3)[..., : self.num_bodies, :]
         self._dof_force_tensor = gymtorch.wrap_tensor(
             self.gym.acquire_dof_force_tensor(self.sim)
-        ).view(self.num_envs, self.num_dof)
+        ).view(num_actors, self.num_dof)
 
-        self._terminate_buf = torch.ones(self.num_envs, device=device, dtype=torch.long)
         self._termination_heights = 0.3
-        self._termination_heights = to_torch(
-            self._termination_heights, device=device
-        )
+        self._terminate_buf = torch.ones(self.num_envs, device=device, dtype=torch.long)
+        self._termination_heights = to_torch(self._termination_heights, device=device)
 
         # TODO: Why is this too small?
         '''
@@ -405,31 +409,23 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         )
         '''
 
-        key_bodies = ["Head", "L_Knee", "R_Knee", "L_Elbow", "R_Elbow", "L_Ankle", "R_Ankle", "L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"] 
+        #key_bodies = ["R_Ankle", "L_Ankle", "R_Wrist",  "L_Wrist"]
+        key_bodies = ['Pelvis', 'L_Hip', 'L_Knee', 'R_Hip', 'R_Knee', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand']
+        # ["Head", "L_Knee", "R_Knee", "L_Elbow", "R_Elbow", "L_Ankle", "R_Ankle", "L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"] 
         obj_obs_size = 15
-        self.ref_hoi_obs_size = 324 + len(key_bodies) * 3
+        # TODO: Fix this
         self.single_observation_space = gym.spaces.Box(low=-np.inf, high=np.inf,
-            shape=(1 + (52) * (3 + 6 + 3 + 3) - 3 + 10 * 3 + obj_obs_size + self.ref_hoi_obs_size,),
+            shape=(1 + (52) * (3 + 6 + 3 + 3) - 3 + 10 * 3 + obj_obs_size,),
             dtype=np.float32
         )
         self.single_action_space = gym.spaces.Box(low=-1, high=1,
-                shape=(51*3,), dtype=np.float32)
-        self.num_agents = num_envs
+                shape=(self.num_dof,), dtype=np.float32)
+        self.num_agents = num_actors
         super().__init__(buf=buf)
 
         humanoid_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         num_bodies = self.gym.get_asset_rigid_body_count(humanoid_asset)
         dof_num = self.gym.get_asset_dof_count(humanoid_asset)
-
-
-        '''
-        # Check if body names are valid
-        for body_name in key_bodies:
-            body_id = self.gym.find_asset_rigid_body_index(humanoid_asset, body_name)
-            print(f"Body name: {body_name}, body_id: {body_id}")
-            if body_id == -1:
-                print(f"Warning: Body '{body_name}' not found in the asset!")
-        '''
 
         # Key body ids
         env_ptr = self.envs[0]
@@ -442,17 +438,6 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
 
         self._key_body_ids = to_torch(body_ids, device=device, dtype=torch.long)
 
-        # Contact body ids
-        env_ptr = self.envs[0]
-        actor_handle = self.humanoid_handles[0]
-        body_ids = []
-        for body_name in self.contact_bodies:
-            body_id = self.gym.find_actor_rigid_body_handle(env_ptr, actor_handle, body_name)
-            assert body_id != -1
-            body_ids.append(body_id)
-
-        self._contact_body_ids = to_torch(body_ids, device=device, dtype=torch.long)
-
         # Buffers
         self.progress_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long)
 
@@ -460,11 +445,15 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             return
 
         self.gym.refresh_actor_root_state_tensor(self.sim)
-        self._cam_prev_char_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
+        self._cam_prev_char_pos = self._root_states[0, 0:3].cpu().numpy()
 
         cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0], self._cam_prev_char_pos[1] - 3.0, 1.0)
         cam_target = gymapi.Vec3(self._cam_prev_char_pos[0], self._cam_prev_char_pos[1], 1.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+
+    def _action_to_pd_targets(self, action):
+        pd_tar = self._pd_action_offset + self._pd_action_scale * action
+        return pd_tar
 
     def _refresh_sim_tensors(self):
         self.gym.refresh_dof_state_tensor(self.sim)
@@ -480,7 +469,6 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         body_rot = self._rigid_body_rot[env_ids]
         body_vel = self._rigid_body_vel[env_ids]
         body_ang_vel = self._rigid_body_ang_vel[env_ids]
-        contact_forces = self._contact_forces[env_ids]
         local_root_obs = False
         root_height_obs = True
         humanoid_obs = compute_humanoid_observations_max(
@@ -490,12 +478,10 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             body_ang_vel,
             local_root_obs,
             root_height_obs,
-            contact_forces,
-            self._contact_body_ids,
         )
 
         # Compute task obs
-        root_states = self._humanoid_root_states[env_ids]
+        root_states = self._root_states[env_ids]
         #tar_states = self._target_states[env_ids]
         #task_obs = compute_obj_observations(root_states, tar_states)
 
@@ -509,17 +495,19 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         #ref_obs = self.hoi_data_dict[0]["hoi_data"][next_ts].clone()
         #self.obs_buf[env_ids] = torch.cat((obs, ref_obs), dim=-1)
 
+        return obs
+
     def reset(self, env_ids=slice(None)):
         if env_ids != slice(None) and len(env_ids) == 0:
             return
 
         # Reset actors
-        self._humanoid_root_states[env_ids] = self._initial_humanoid_root_states[env_ids]
+        self._root_states[env_ids] = self._initial_root_states[env_ids]
         self._dof_pos[env_ids] = self._initial_dof_pos[env_ids]
         self._dof_vel[env_ids] = self._initial_dof_vel[env_ids]
 
         # Reset env tensors
-        env_ids_int32 = self._humanoid_actor_ids[env_ids]
+        env_ids_int32 = self._actor_ids[env_ids]
         self.gym.set_actor_root_state_tensor_indexed(
             self.sim,
             gymtorch.unwrap_tensor(self._root_states),
@@ -536,10 +524,13 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         #self.reset_buf[env_ids] = 0
         #self._terminate_buf[env_ids] = 0
         self._refresh_sim_tensors()
-        #self._compute_observations(env_ids)
+        obs = self._compute_observations(env_ids)
+        return obs
 
     def step(self, actions):
         self.actions = actions.to(self.device).clone()
+        #pd_tar = self._action_to_pd_targets(self.actions)
+        #pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
         pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
         self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
 
@@ -549,8 +540,8 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self.progress_buf += 1
         self._refresh_sim_tensors()
 
+        obs = self._compute_observations()
         '''
-        self._compute_observations()
         self.rew_buf[:] = compute_humanoid_reward(
             self._curr_ref_obs,
             self._curr_obs,
@@ -579,6 +570,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             self.gym.clear_lines(self.viewer)
 
         ## Return observations, rewards, resets, ...
+        return obs
 
     def render(self, sync_frame_time=False):
         if not self.viewer:
@@ -586,7 +578,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             return
 
         self.gym.refresh_actor_root_state_tensor(self.sim)
-        char_root_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
+        char_root_pos = self._root_states[0, 0:3].cpu().numpy()
 
         cam_trans = self.gym.get_viewer_camera_transform(self.viewer, None)
         cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
@@ -633,7 +625,7 @@ def compute_obj_observations(root_states, tar_states):
 
 
 #@torch.jit.script
-def compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs, contact_forces, contact_body_ids):
+def compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs):
     # type: (Tensor, Tensor, Tensor, Tensor, bool, bool, Tensor, Tensor) -> Tensor
     root_pos = body_pos[:, 0, :]
     root_rot = body_rot[:, 0, :]
@@ -675,9 +667,9 @@ def compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel
     flat_local_body_ang_vel = quat_rotate(flat_heading_rot, flat_body_ang_vel)
     local_body_ang_vel = flat_local_body_ang_vel.reshape(body_ang_vel.shape[0], body_ang_vel.shape[1] * body_ang_vel.shape[2])
 
-    body_contact_buf = contact_forces[:, contact_body_ids, :].clone().view(contact_forces.shape[0],-1)
-    
-    obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel, body_contact_buf), dim=-1)
+    # Think this should give you:
+    # [root_height, joint_positions, joint_rotations, joint_velocities, angular_velocities]
+    obs = torch.cat((root_h_obs, local_body_pos, local_body_rot_obs, local_body_vel, local_body_ang_vel), dim=-1)
     return obs
 
 def compute_humanoid_reward(hoi_ref, hoi_obs, contact_buf, tar_contact_forces, len_keypos, w):
@@ -850,46 +842,6 @@ def compute_humanoid_reset(
 def to_torch(x, dtype=torch.float, device="cuda:0", requires_grad=False):
     return torch.tensor(x, dtype=dtype, device=device, requires_grad=requires_grad)
 
-#@torch.jit.script
-def quat_to_angle_axis(q):
-    # type: (Tensor) -> Tuple[Tensor, Tensor]
-    # computes axis-angle representation from quaternion q
-    # q must be normalized
-    min_theta = 1e-5
-    qx, qy, qz, qw = 0, 1, 2, 3
-
-    sin_theta = torch.sqrt(1 - q[..., qw] * q[..., qw])
-    angle = 2 * torch.acos(q[..., qw])
-    angle = normalize_angle(angle)
-    sin_theta_expand = sin_theta.unsqueeze(-1)
-    axis = q[..., qx:qw] / sin_theta_expand
-
-    mask = torch.abs(sin_theta) > min_theta
-    default_axis = torch.zeros_like(axis)
-    default_axis[..., -1] = 1
-
-    angle = torch.where(mask, angle, torch.zeros_like(angle))
-    mask_expand = mask.unsqueeze(-1)
-    axis = torch.where(mask_expand, axis, default_axis)
-    return angle, axis
-
-@torch.jit.script
-def angle_axis_to_exp_map(angle, axis):
-    # type: (Tensor, Tensor) -> Tensor
-    # compute exponential map from axis-angle
-    angle_expand = angle.unsqueeze(-1)
-    exp_map = angle_expand * axis
-    return exp_map
-
-@torch.jit.script
-def quat_to_exp_map(q):
-    # type: (Tensor) -> Tensor
-    # compute exponential map from quaternion
-    # q must be normalized
-    angle, axis = quat_to_angle_axis(q)
-    exp_map = angle_axis_to_exp_map(angle, axis)
-    return exp_map
-
 @torch.jit.script
 def quat_to_tan_norm(q):
     # type: (Tensor) -> Tensor
@@ -906,62 +858,6 @@ def quat_to_tan_norm(q):
     return norm_tan
 
 #@torch.jit.script
-def euler_xyz_to_exp_map(roll, pitch, yaw):
-    # type: (Tensor, Tensor, Tensor) -> Tensor
-    q = quat_from_euler_xyz(roll, pitch, yaw)
-    exp_map = quat_to_exp_map(q)
-    return exp_map
-
-#@torch.jit.script
-def exp_map_to_angle_axis(exp_map):
-    min_theta = 1e-5
-
-    angle = torch.norm(exp_map, dim=-1)
-    angle_exp = torch.unsqueeze(angle, dim=-1)
-    axis = exp_map / angle_exp
-    angle = normalize_angle(angle)
-
-    default_axis = torch.zeros_like(exp_map)
-    default_axis[..., -1] = 1
-
-    mask = torch.abs(angle) > min_theta
-    angle = torch.where(mask, angle, torch.zeros_like(angle))
-    mask_expand = mask.unsqueeze(-1)
-    axis = torch.where(mask_expand, axis, default_axis)
-
-    return angle, axis
-
-#@torch.jit.script
-def exp_map_to_quat(exp_map):
-    angle, axis = exp_map_to_angle_axis(exp_map)
-    q = quat_from_angle_axis(angle, axis)
-    return q
-
-#@torch.jit.script
-def slerp(q0, q1, t):
-    # type: (Tensor, Tensor, Tensor) -> Tensor
-    cos_half_theta = torch.sum(q0 * q1, dim=-1)
-
-    neg_mask = cos_half_theta < 0
-    q1 = q1.clone()
-    q1[neg_mask] = -q1[neg_mask]
-    cos_half_theta = torch.abs(cos_half_theta)
-    cos_half_theta = torch.unsqueeze(cos_half_theta, dim=-1)
-
-    half_theta = torch.acos(cos_half_theta);
-    sin_half_theta = torch.sqrt(1.0 - cos_half_theta * cos_half_theta);
-
-    ratioA = torch.sin((1 - t) * half_theta) / sin_half_theta;
-    ratioB = torch.sin(t * half_theta) / sin_half_theta; 
-    
-    new_q = ratioA * q0 + ratioB * q1
-
-    new_q = torch.where(torch.abs(sin_half_theta) < 0.001, 0.5 * q0 + 0.5 * q1, new_q)
-    new_q = torch.where(torch.abs(cos_half_theta) >= 1, q0, new_q)
-
-    return new_q
-
-#@torch.jit.script
 def calc_heading(q):
     # type: (Tensor) -> Tensor
     # calculate heading direction from quaternion
@@ -973,19 +869,6 @@ def calc_heading(q):
 
     heading = torch.atan2(rot_dir[..., 1], rot_dir[..., 0])
     return heading
-
-#@torch.jit.script
-def calc_heading_quat(q):
-    # type: (Tensor) -> Tensor
-    # calculate heading rotation from quaternion
-    # the heading is the direction on the xy plane
-    # q must be normalized
-    heading = calc_heading(q)
-    axis = torch.zeros_like(q[..., 0:3])
-    axis[..., 2] = 1
-
-    heading_q = quat_from_angle_axis(heading, axis)
-    return heading_q
 
 #@torch.jit.script
 def calc_heading_quat_inv(q):

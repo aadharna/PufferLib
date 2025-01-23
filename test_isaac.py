@@ -7,12 +7,13 @@ def test_base_env():
         env.step(None)
 
 def test_humanoid():
-    env = HumanoidSMPLX(headless=False)
+    env = HumanoidSMPLX(num_envs=32, headless=False)
     env.reset()
     env.render()
+    import time
     while True:
-        action = torch.from_numpy(env.action_space.sample())
-        env.step(action)
+        action = torch.from_numpy(1.0*env.action_space.sample())
+        obs = env.step(action)
         env.render()
 
 def test_humanoid_perf(timeout=10, num_envs=4096):
