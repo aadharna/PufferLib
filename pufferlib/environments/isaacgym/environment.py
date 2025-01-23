@@ -303,9 +303,9 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
                 start_pose, "humanoid", group=env_id, filter=0, segmentationId=0)
             self.gym.enable_actor_dof_force_sensors(env_ptr, humanoid_handle)
 
+            #gymapi.Vec3(0.54, 0.85, 0.2)
+            color = gymapi.Vec3(np.random.rand(), np.random.rand(), np.random.rand())
             for j in range(self.num_bodies):
-                #gymapi.Vec3(0.54, 0.85, 0.2)
-                color = gymapi.Vec3(np.random.rand(), np.random.rand(), np.random.rand())
                 self.gym.set_rigid_body_color(env_ptr, humanoid_handle, j, gymapi.MESH_VISUAL, color)
 
             dof_prop = self.gym.get_asset_dof_properties(humanoid_asset)
@@ -339,13 +339,14 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         self._pd_action_scale = to_torch(self._pd_action_scale, device=device)
 
         # Feet?
-        self.contact_bodies = ["Head"] 
+        self.contact_bodies = ["L_Index3", "L_Middle3", "L_Pinky3", "L_Ring3","L_Thumb3","R_Index3", "R_Middle3", "R_Pinky3", "R_Ring3","R_Thumb3"]
         self.debug_viz = False
 
         # Initialize the sim now
         self.gym.prepare_sim(self.sim)
 
         # get gym GPU state tensors
+        self._refresh_sim_tensors()
         self._root_states = gymtorch.wrap_tensor(self.gym.acquire_actor_root_state_tensor(self.sim))
         num_actors = self._root_states.shape[0] // self.num_envs
         self._humanoid_root_states = self._root_states.view(
@@ -464,7 +465,6 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         cam_target = gymapi.Vec3(self._cam_prev_char_pos[0], self._cam_prev_char_pos[1], 1.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
-
     def _refresh_sim_tensors(self):
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
@@ -538,10 +538,11 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         #self._compute_observations(env_ids)
 
     def step(self, actions):
-        self.actions = actions.to(self.device).clone()
-        pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
-        self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
+        #self.actions = actions.to(self.device).clone()
+        #pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
+        #self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
 
+        self._refresh_sim_tensors()
         self.env.step()
 
         self.progress_buf += 1
