@@ -3,6 +3,7 @@ from pdb import set_trace as T
 import gymnasium as gym
 import numpy as np
 import functools
+import math
 import sys
 import os
 
@@ -297,7 +298,7 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
             char_h = 0.89
             start_pose = gymapi.Transform()
             start_pose.p = gymapi.Vec3(*get_axis_params(char_h, 2))
-            start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+            start_pose.r = gymapi.Quat.from_euler_zyx(math.pi / 2, 0, 0)
 
             humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset,
                 start_pose, "humanoid", group=env_id, filter=0, segmentationId=0)
@@ -538,9 +539,9 @@ class HumanoidSMPLX(pufferlib.PufferEnv):
         #self._compute_observations(env_ids)
 
     def step(self, actions):
-        #self.actions = actions.to(self.device).clone()
-        #pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
-        #self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
+        self.actions = actions.to(self.device).clone()
+        pd_tar_tensor = gymtorch.unwrap_tensor(self._pd_action_offset + self._pd_action_scale*self.actions)
+        self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
 
         self._refresh_sim_tensors()
         self.env.step()
