@@ -13,6 +13,7 @@ from .moba.moba import Moba
 from .nmmo3.nmmo3 import NMMO3
 from .go.go import Go
 from .rware.rware import Rware
+from .capacity.capacity import Capacity
 #from .rocket_lander import rocket_lander
 
 def make_foraging(width=1080, height=720, num_agents=4096, horizon=512,
@@ -129,6 +130,7 @@ MAKE_FNS = {
     'nmmo3': NMMO3,
     'snake': Snake,
     'squared': Squared,
+    'capacity': Capacity,
     'connect4': Connect4,
     'tripletriad': TripleTriad,
     'tactical': Tactical,
