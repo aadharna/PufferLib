@@ -248,6 +248,31 @@ def sweep_carbs(args, env_name, make_env, policy_cls, rnn_cls):
         target, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls, target_metric)
         carbs.observe(score=target, cost=uptime)
 
+
+ 
+def sweep_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
+    target_metric = args['sweep']['metric']['name']
+    max_suggestion_cost = args['base']['max_suggestion_cost']
+    from pufferlib.sweep import PufferCarbs as NeoCarbs
+    carbs = NeoCarbs(
+        args['sweep'],
+        resample_frequency=5,
+        num_random_samples=10, # Should be number of params
+        max_suggestion_cost=max_suggestion_cost,
+    )
+    for i in range(args['max_runs']):
+        seed = time.time_ns() & 0xFFFFFFFF
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
+        hypers = carbs.suggest()
+        for k, v in hypers.items():
+            args[k].update(v)
+
+        target, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls, target_metric)
+        carbs.observe(score=target, cost=uptime)
+
 def synthetic_basic_task(args):
     train_args = args['train']
     learning_rate = train_args['learning_rate']
@@ -433,7 +458,7 @@ def test_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
     carbs = NeoCarbs(
         args['sweep'],
         resample_frequency=5,
-        num_random_samples=200, # Should be number of params
+        num_random_samples=10, # Should be number of params
         max_suggestion_cost=args['base']['max_suggestion_cost'],
     )
     scores = []
@@ -445,7 +470,7 @@ def test_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
         torch.manual_seed(seed)
  
         hypers = carbs.suggest()
-        score, cost = synthetic_log_task(hypers)
+        score, cost = synthetic_percentile_task(hypers)
         carbs.observe(score=score, cost=cost)
         print('Score:', score, 'Cost:', cost)
 
@@ -558,7 +583,7 @@ if __name__ == '__main__':
     parser.add_argument('--env', '--environment', type=str,
         default='puffer_squared', help='Name of specific environment to run')
     parser.add_argument('--mode', type=str, default='train',
-        choices='train eval evaluate sweep sweep-carbs test-random test-carbs test-neocarbs autotune profile'.split())
+        choices='train eval evaluate sweep sweep-carbs sweep-neocarbs test-random test-carbs test-neocarbs autotune profile'.split())
     parser.add_argument('--vec', '--vector', '--vectorization', type=str,
         default='native', choices=['serial', 'multiprocessing', 'ray', 'native'])
     parser.add_argument('--vec-overwork', action='store_true',
@@ -676,6 +701,8 @@ if __name__ == '__main__':
         sweep(args, env_name, make_env, policy_cls, rnn_cls)
     elif args['mode'] == 'sweep-carbs':
         sweep_carbs(args, env_name, make_env, policy_cls, rnn_cls)
+    elif args['mode'] == 'sweep-neocarbs':
+        sweep_neocarbs(args, env_name, make_env, policy_cls, rnn_cls)
     elif args['mode'] == 'test-carbs':
         test_carbs(args, env_name, make_env, policy_cls, rnn_cls)
     elif args['mode'] == 'test-neocarbs':
