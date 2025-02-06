@@ -184,6 +184,8 @@ def quantile_transform(raw_scores):
     normalized_scores = np.sqrt(2) * scipy.special.erfinv(2*p - 1)
     return normalized_scores
 
+# TODO: Suggestions per pareto
+# Resample updates existing point
 class PufferCarbs:
     def __init__(self,
             sweep_config,
@@ -193,7 +195,8 @@ class PufferCarbs:
             seed = 0,
             initial_search_radius = 0.3,
             global_search_scale = 1,
-            num_suggestion_candidates = 2048,
+            random_suggestions = 1024,
+            suggestions_per_pareto = 100,
         ):
         self.spaces = _carbs_params_from_puffer_sweep(sweep_config)
         self.flat_spaces = dict(pufferlib.utils.unroll_nested_dict(self.spaces))
@@ -208,7 +211,8 @@ class PufferCarbs:
         self.num_random_samples = num_random_samples
         self.initial_search_radius = initial_search_radius
         self.global_search_scale = global_search_scale
-        self.num_suggestion_candidates = num_suggestion_candidates
+        self.random_suggestions = random_suggestions
+        self.suggestions_per_pareto = suggestions_per_pareto
         self.resample_frequency = resample_frequency
         self.max_suggestion_cost = max_suggestion_cost
 
@@ -240,11 +244,16 @@ class PufferCarbs:
         self.suggestion_idx += 1
         # TODO: Clip random samples to bounds so we don't get bad high cost samples
         if self.suggestion_idx <= self.num_random_samples:
-            suggestions = sample_uniform(self.search_centers[None, :], self.search_scales, self.num_suggestion_candidates)
+            suggestions = sample_uniform(
+                self.search_centers[None, :], self.search_scales, self.random_suggestions)
             suggestions = np.clip(suggestions, self.min_bounds, self.max_bounds)
+            best_idx = np.random.randint(0, self.random_suggestions)
+            best = suggestions[best_idx]
         elif self.resample_frequency and self.suggestion_idx % self.resample_frequency == 0:
             candidates, _ = pareto_points(self.success_observations)
             suggestions = np.stack([e['input'] for e in candidates])
+            best_idx = np.random.randint(0, len(candidates))
+            best = suggestions[best_idx]
         else:
             params = np.array([e['input'] for e in self.success_observations])
             params = torch.from_numpy(params)
@@ -286,7 +295,8 @@ class PufferCarbs:
             ### Sample suggestions
             candidates, pareto_idxs = pareto_points(self.success_observations)
             search_centers = np.stack([e['input'] for e in candidates])
-            suggestions = sample_normal(search_centers, self.search_scales, self.num_suggestion_candidates)
+            suggestions = sample_normal(search_centers,
+                self.search_scales, len(candidates)*self.suggestions_per_pareto)
             suggestions = np.clip(suggestions, self.min_bounds, self.max_bounds)
 
             ### Predict scores and costs
@@ -335,8 +345,7 @@ class PufferCarbs:
                 #f'Var: {var:.3f}',
             )
 
-            suggestions = suggestions[best_idx:best_idx+1].numpy()
-
+            best = suggestions[best_idx].numpy()
 
             '''
             from bokeh.models import ColumnDataSource, LinearColorMapper
@@ -388,9 +397,7 @@ class PufferCarbs:
             '''
 
 
-        best = suggestions[0]
         self.suggestion = best
-
         params = deepcopy(self.spaces)
         fill(params, best)
         return params
