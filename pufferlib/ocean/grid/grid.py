@@ -21,6 +21,7 @@ class PufferGrid(pufferlib.PufferEnv):
         self.float_actions = np.zeros_like(self.actions).astype(np.float32)
         self.c_envs = CGrid(self.observations, self.float_actions,
             self.rewards, self.terminals, num_envs, num_maps, max_map_size)
+        # breakpoint()
         pass
 
     def reset(self, seed=None):

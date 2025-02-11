@@ -131,16 +131,16 @@ def sample_hyperparameters(sweep_config):
 
     return samples
 
-from carbs import (
-    CARBS,
-    CARBSParams,
-    ObservationInParam,
-    Param,
-    LinearSpace,
-    Pow2Space,
-    LogSpace,
-    LogitSpace,
-)
+# from carbs import (
+#     CARBS,
+#     CARBSParams,
+#     ObservationInParam,
+#     Param,
+#     LinearSpace,
+#     Pow2Space,
+#     LogSpace,
+#     LogitSpace,
+# )
 
 class PufferCarbs:
     def __init__(self,
@@ -610,6 +610,8 @@ if __name__ == '__main__':
     args = parser.parse_known_args()[0]
 
     file_paths = glob.glob('config/**/*.ini', recursive=True)
+    from pdb import set_trace as T
+    
     for path in file_paths:
         p = configparser.ConfigParser()
         p.read('config/default.ini')
@@ -657,7 +659,9 @@ if __name__ == '__main__':
     env_module = importlib.import_module(module_name)
 
     make_env = env_module.env_creator(env_name)
+    # T()
     policy_cls = getattr(env_module.torch, args['base']['policy_name'])
+    
     
     rnn_name = args['base']['rnn_name']
     rnn_cls = None

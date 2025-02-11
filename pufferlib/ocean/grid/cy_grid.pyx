@@ -128,6 +128,8 @@ cdef class CGrid:
             init_state(&self.levels[i], max_size, 1)
             get_state(&self.envs[0], &self.levels[i])
 
+            # breakpoint()
+
     def reset(self):
         cdef int i, idx
         for i in range(self.num_envs):
