@@ -131,122 +131,122 @@ def sample_hyperparameters(sweep_config):
 
     return samples
 
-from carbs import (
-    CARBS,
-    CARBSParams,
-    ObservationInParam,
-    Param,
-    LinearSpace,
-    Pow2Space,
-    LogSpace,
-    LogitSpace,
-)
+# from carbs import (
+#     CARBS,
+#     CARBSParams,
+#     ObservationInParam,
+#     Param,
+#     LinearSpace,
+#     Pow2Space,
+#     LogSpace,
+#     LogitSpace,
+# )
+# 
+# class PufferCarbs:
+#     def __init__(self,
+#             sweep_config: dict,
+#             max_suggestion_cost: float = None,
+#             resample_frequency: int = 5,
+#             num_random_samples: int = 10,
+#         ):
+#         param_spaces = _carbs_params_from_puffer_sweep(sweep_config)
+#         flat_spaces = [e[1] for e in pufferlib.utils.unroll_nested_dict(param_spaces)]
+#         for e in flat_spaces:
+#             print(e.name, e.space)
 
-class PufferCarbs:
-    def __init__(self,
-            sweep_config: dict,
-            max_suggestion_cost: float = None,
-            resample_frequency: int = 5,
-            num_random_samples: int = 10,
-        ):
-        param_spaces = _carbs_params_from_puffer_sweep(sweep_config)
-        flat_spaces = [e[1] for e in pufferlib.utils.unroll_nested_dict(param_spaces)]
-        for e in flat_spaces:
-            print(e.name, e.space)
+#         metric = sweep_config['metric']
+#         goal = metric['goal']
+#         assert goal in ['maximize', 'minimize'], f"Invalid goal {goal}"
+#         self.carbs_params = CARBSParams(
+#             better_direction_sign=1 if goal == 'maximize' else -1,
+#             is_wandb_logging_enabled=False,
+#             resample_frequency=resample_frequency,
+#             num_random_samples=num_random_samples,
+#             max_suggestion_cost=max_suggestion_cost,
+#             is_saved_on_every_observation=False,
+#             #num_candidates_for_suggestion_per_dim=10
+#         )
+#         self.carbs = CARBS(self.carbs_params, flat_spaces)
 
-        metric = sweep_config['metric']
-        goal = metric['goal']
-        assert goal in ['maximize', 'minimize'], f"Invalid goal {goal}"
-        self.carbs_params = CARBSParams(
-            better_direction_sign=1 if goal == 'maximize' else -1,
-            is_wandb_logging_enabled=False,
-            resample_frequency=resample_frequency,
-            num_random_samples=num_random_samples,
-            max_suggestion_cost=max_suggestion_cost,
-            is_saved_on_every_observation=False,
-            #num_candidates_for_suggestion_per_dim=10
-        )
-        self.carbs = CARBS(self.carbs_params, flat_spaces)
+#     def suggest(self, args):
+#         #start = time.time()
+#         self.suggestion = self.carbs.suggest().suggestion
+#         #print(f'Suggestion took {time.time() - start} seconds')
+#         for k in ('train', 'env'):
+#             for name, param in args['sweep'][k].items():
+#                 if name in self.suggestion:
+#                     args[k][name] = self.suggestion[name]
 
-    def suggest(self, args):
-        #start = time.time()
-        self.suggestion = self.carbs.suggest().suggestion
-        #print(f'Suggestion took {time.time() - start} seconds')
-        for k in ('train', 'env'):
-            for name, param in args['sweep'][k].items():
-                if name in self.suggestion:
-                    args[k][name] = self.suggestion[name]
+#     def observe(self, score, cost, is_failure=False):
+#         #start = time.time()
+#         self.carbs.observe(
+#             ObservationInParam(
+#                 input=self.suggestion,
+#                 output=score,
+#                 cost=cost,
+#                 is_failure=is_failure,
+#             )
+#         )
+#         #print(f'Observation took {time.time() - start} seconds')
 
-    def observe(self, score, cost, is_failure=False):
-        #start = time.time()
-        self.carbs.observe(
-            ObservationInParam(
-                input=self.suggestion,
-                output=score,
-                cost=cost,
-                is_failure=is_failure,
-            )
-        )
-        #print(f'Observation took {time.time() - start} seconds')
+# def _carbs_params_from_puffer_sweep(sweep_config):
+#     param_spaces = {}
+#     for name, param in sweep_config.items():
+#         if name in ('method', 'name', 'metric'):
+#             continue
 
-def _carbs_params_from_puffer_sweep(sweep_config):
-    param_spaces = {}
-    for name, param in sweep_config.items():
-        if name in ('method', 'name', 'metric'):
-            continue
-
-        assert isinstance(param, dict)
-        if any(isinstance(param[k], dict) for k in param):
-            param_spaces[name] = _carbs_params_from_puffer_sweep(param)
-            continue
+#         assert isinstance(param, dict)
+#         if any(isinstance(param[k], dict) for k in param):
+#             param_spaces[name] = _carbs_params_from_puffer_sweep(param)
+#             continue
  
-        assert 'distribution' in param
-        distribution = param['distribution']
-        search_center = param['mean']
-        kwargs = dict(
-            min=param['min'],
-            max=param['max'],
-            scale=param['scale'],
-            mean=search_center,
-        )
-        if distribution == 'uniform':
-            space = LinearSpace(**kwargs)
-        elif distribution == 'int_uniform':
-            space = LinearSpace(**kwargs, is_integer=True)
-        elif distribution == 'uniform_pow2':
-            space = Pow2Space(**kwargs, is_integer=True)
-        elif distribution == 'log_normal':
-            space = LogSpace(**kwargs)
-        elif distribution == 'logit_normal':
-            space = LogitSpace(**kwargs)
-        else:
-            raise ValueError(f'Invalid distribution: {distribution}')
+#         assert 'distribution' in param
+#         distribution = param['distribution']
+#         search_center = param['mean']
+#         kwargs = dict(
+#             min=param['min'],
+#             max=param['max'],
+#             scale=param['scale'],
+#             mean=search_center,
+#         )
+#         if distribution == 'uniform':
+#             space = LinearSpace(**kwargs)
+#         elif distribution == 'int_uniform':
+#             space = LinearSpace(**kwargs, is_integer=True)
+#         elif distribution == 'uniform_pow2':
+#             space = Pow2Space(**kwargs, is_integer=True)
+#         elif distribution == 'log_normal':
+#             space = LogSpace(**kwargs)
+#         elif distribution == 'logit_normal':
+#             space = LogitSpace(**kwargs)
+#         else:
+#             raise ValueError(f'Invalid distribution: {distribution}')
 
-        param_spaces[name] = Param(name=name, space=space, search_center=search_center)
+#         param_spaces[name] = Param(name=name, space=space, search_center=search_center)
 
-    return param_spaces
+#     return param_spaces
 
-def sweep_carbs(args, env_name, make_env, policy_cls, rnn_cls):
-    target_metric = args['sweep']['metric']['name']
-    carbs = PufferCarbs(
-        args['sweep'],
-        resample_frequency=5,
-        num_random_samples=10, # Should be number of params
-        max_suggestion_cost=args['base']['max_suggestion_cost'],
-    )
-    for i in range(args['max_runs']):
-        seed = time.time_ns() & 0xFFFFFFFF
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+# def sweep_carbs(args, env_name, make_env, policy_cls, rnn_cls):
+#     target_metric = args['sweep']['metric']['name']
+#     carbs = PufferCarbs(
+#         args['sweep'],
+#         resample_frequency=5,
+#         num_random_samples=10, # Should be number of params
+#         max_suggestion_cost=args['base']['max_suggestion_cost'],
+#     )
+#     for i in range(args['max_runs']):
+#         seed = time.time_ns() & 0xFFFFFFFF
+#         random.seed(seed)
+#         np.random.seed(seed)
+#         torch.manual_seed(seed)
 
-        carbs.suggest(args)
-        if args['train']['minibatch_size'] > 32_768:
-            carbs.observe(score=0, cost=0, is_failure=True)
-            continue
+#         carbs.suggest(args)
+#         if args['train']['minibatch_size'] > 32_768:
+#             carbs.observe(score=0, cost=0, is_failure=True)
+#             continue
 
-        target, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls, target_metric)
-        carbs.observe(score=target, cost=uptime)
+#         target, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls, target_metric)
+#         carbs.observe(score=target, cost=uptime)
 
 
  
@@ -389,68 +389,68 @@ def test_random_search(args, env_name, make_env, policy_cls, rnn_cls):
     ''' 
 
 
-def test_carbs(args, env_name, make_env, policy_cls, rnn_cls):
-    target_metric = args['sweep']['metric']['name']
-    carbs = PufferCarbs(
-        args['sweep'],
-        resample_frequency=5,
-        num_random_samples=50, # Should be number of params
-        max_suggestion_cost=args['base']['max_suggestion_cost'],
-    )
-    scores = []
-    costs = []
-    for i in range(args['max_runs']):
-        seed = time.time_ns() & 0xFFFFFFFF
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
+# def test_carbs(args, env_name, make_env, policy_cls, rnn_cls):
+#     target_metric = args['sweep']['metric']['name']
+#     carbs = PufferCarbs(
+#         args['sweep'],
+#         resample_frequency=5,
+#         num_random_samples=50, # Should be number of params
+#         max_suggestion_cost=args['base']['max_suggestion_cost'],
+#     )
+#     scores = []
+#     costs = []
+#     for i in range(args['max_runs']):
+#         seed = time.time_ns() & 0xFFFFFFFF
+#         random.seed(seed)
+#         np.random.seed(seed)
+#         torch.manual_seed(seed)
  
-        carbs.suggest(args)
+#         carbs.suggest(args)
 
-        # Optimal params
-        '''
-        train_args = args['train']
-        train_args['total_timesteps'] = 1e10
-        train_args['batch_size'] = 262144
-        train_args['minibatch_size'] = 16384
-        train_args['learning_rate'] = 0.001
-        train_args['gamma'] = 0.99
-        train_args['gae_lambda'] = 0.95
-        train_args['update_epochs'] = 4
-        train_args['bptt_horizon'] = 16
-        '''
+#         # Optimal params
+#         '''
+#         train_args = args['train']
+#         train_args['total_timesteps'] = 1e10
+#         train_args['batch_size'] = 262144
+#         train_args['minibatch_size'] = 16384
+#         train_args['learning_rate'] = 0.001
+#         train_args['gamma'] = 0.99
+#         train_args['gae_lambda'] = 0.95
+#         train_args['update_epochs'] = 4
+#         train_args['bptt_horizon'] = 16
+#         '''
 
-        score, cost = synthetic_log_task(args)
+#         score, cost = synthetic_log_task(args)
 
-        '''
-        neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
-        for k, v in pufferlib.utils.unroll_nested_dict(args):
-            neptune[k].append(v)
+#         '''
+#         neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
+#         for k, v in pufferlib.utils.unroll_nested_dict(args):
+#             neptune[k].append(v)
 
-        neptune['environment/score'].append(score)
-        neptune['environment/uptime'].append(cost)
-        neptune.stop()
-        '''
+#         neptune['environment/score'].append(score)
+#         neptune['environment/uptime'].append(cost)
+#         neptune.stop()
+#         '''
  
-        #stats, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls)
-        carbs.observe(score=score, cost=cost)
+#         #stats, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls)
+#         carbs.observe(score=score, cost=cost)
 
-        scores.append(score)
-        costs.append(cost)
+#         scores.append(score)
+#         costs.append(cost)
 
-        #print(scores)
-        pareto = carbs.carbs._get_pareto_groups()
-        #print(pareto)
-        '''
-        import plotly.graph_objects as go
-        scores.append(score)
-        t = list(range(len(scores)))
-        fig = go.Figure(data=go.Scatter(x=t, y=scores, mode='markers'))
-        fig.update_layout(title='CARBS Synthetic Test', xaxis_title='Index', yaxis_title='Value')
-        fig.show()
-        '''
+#         #print(scores)
+#         pareto = carbs.carbs._get_pareto_groups()
+#         #print(pareto)
+#         '''
+#         import plotly.graph_objects as go
+#         scores.append(score)
+#         t = list(range(len(scores)))
+#         fig = go.Figure(data=go.Scatter(x=t, y=scores, mode='markers'))
+#         fig.update_layout(title='CARBS Synthetic Test', xaxis_title='Index', yaxis_title='Value')
+#         fig.show()
+#         '''
 
-    np.save(args['data_path']+'.npy', {'scores': scores, 'costs': costs})
+#     np.save(args['data_path']+'.npy', {'scores': scores, 'costs': costs})
 
 def test_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
     target_metric = args['sweep']['metric']['name']
@@ -699,12 +699,12 @@ if __name__ == '__main__':
     elif args['mode'] == 'sweep':
         assert args['wandb'] or args['neptune'], 'Sweeps require either wandb or neptune'
         sweep(args, env_name, make_env, policy_cls, rnn_cls)
-    elif args['mode'] == 'sweep-carbs':
-        sweep_carbs(args, env_name, make_env, policy_cls, rnn_cls)
+    # elif args['mode'] == 'sweep-carbs':
+    #     sweep_carbs(args, env_name, make_env, policy_cls, rnn_cls)
     elif args['mode'] == 'sweep-neocarbs':
         sweep_neocarbs(args, env_name, make_env, policy_cls, rnn_cls)
-    elif args['mode'] == 'test-carbs':
-        test_carbs(args, env_name, make_env, policy_cls, rnn_cls)
+    # elif args['mode'] == 'test-carbs':
+    #     test_carbs(args, env_name, make_env, policy_cls, rnn_cls)
     elif args['mode'] == 'test-neocarbs':
         test_neocarbs(args, env_name, make_env, policy_cls, rnn_cls)
     elif args['mode'] == 'test-random':
