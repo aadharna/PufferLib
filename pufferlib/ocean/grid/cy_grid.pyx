@@ -16,6 +16,7 @@ cdef extern from "grid.h":
         float episode_return;
         float episode_length;
         float score;
+        float difficulty;
 
     ctypedef struct LogBuffer
     LogBuffer* allocate_logbuffer(int)
@@ -51,13 +52,16 @@ cdef extern from "grid.h":
         float* actions;
         float* rewards;
         unsigned char* dones;
+        float difficulty;
 
     ctypedef struct State:
         int width;
         int height;
         int num_agents;
+        float difficulty;
         Agent* agents;
         unsigned char* grid;
+        float difficulty;
 
     cdef:
         void create_maze_level(Grid* env, int width, int height, float difficulty, int seed)
@@ -70,7 +74,7 @@ cdef extern from "grid.h":
         Renderer* init_renderer(int cell_size, int width, int height)
         void render_global(Renderer*erenderer, Grid* env, float frac)
         void close_renderer(Renderer* renderer)
-        void init_state(State* state, int max_size, int num_agents)
+        void init_state(State* state, int max_size, int num_agents, float difficulty)
         void free_state(State* state)
         void get_state(Grid* env, State* state)
         void set_state(Grid* env, State* state)
@@ -88,7 +92,7 @@ cdef class CGrid:
         int num_maps
         int max_size
 
-    def __init__(self, unsigned char[:, :] observations, float[:] actions,
+    def __init__(self, unsigned char[:, :] observations, float[:] actions, float[:] difficulties, float[:] outcomes,
             float[:] rewards, unsigned char[:] terminals, int num_envs, int num_maps,
             int max_size):
 
@@ -113,6 +117,7 @@ cdef class CGrid:
                 vision = 5,
                 speed = 1,
                 discretize = True,
+                difficulty = 0.,
             )
             init_grid(&self.envs[i])
 
@@ -123,9 +128,9 @@ cdef class CGrid:
             if size % 2 == 0:
                 size -= 1
 
-            difficulty = np.random.rand()
+            difficulty = difficulties[i]
             create_maze_level(&self.envs[0], size, size, difficulty, i)
-            init_state(&self.levels[i], max_size, 1)
+            init_state(&self.levels[i], max_size, 1, difficulty)
             get_state(&self.envs[0], &self.levels[i])
 
     def reset(self):

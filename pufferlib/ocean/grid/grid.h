@@ -38,6 +38,7 @@ struct Log {
     float episode_return;
     float episode_length;
     float score;
+    float difficulty;
 };
 
 typedef struct LogBuffer LogBuffer;
@@ -137,6 +138,7 @@ struct Grid{
     float* actions;
     float* rewards;
     unsigned char* dones;
+    float difficulty;
 };
 
 void init_grid(Grid* env) {
@@ -280,11 +282,13 @@ struct State {
     int num_agents;
     Agent* agents;
     unsigned char* grid;
+    float difficulty;
 };
 
-void init_state(State* state, int max_size, int num_agents) {
+void init_state(State* state, int max_size, int num_agents, float difficulty) {
     state->agents = calloc(num_agents, sizeof(Agent));
     state->grid = calloc(max_size*max_size, sizeof(unsigned char));
+    state->difficulty = difficulty;
 }
 
 void free_state(State* state) {
@@ -297,6 +301,7 @@ void get_state(Grid* env, State* state) {
     state->width = env->width;
     state->height = env->height;
     state->num_agents = env->num_agents;
+    state->difficulty = env->difficulty;
     memcpy(state->agents, env->agents, env->num_agents*sizeof(Agent));
     memcpy(state->grid, env->grid, env->max_size*env->max_size);
 }
@@ -734,6 +739,7 @@ void generate_growing_tree_maze(unsigned char* grid,
 void create_maze_level(Grid* env, int width, int height, float difficulty, int seed) {
     env->width = width;
     env->height = height;
+    env->difficulty = difficulty;
     generate_growing_tree_maze(env->grid, width, height, env->max_size, difficulty, seed);
     make_border(env);
     spawn_agent(env, 0, 1, 1);
