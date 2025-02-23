@@ -506,6 +506,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         raise ValueError(f'Invalid --vector (serial/multiprocessing/ray/native).')
 
     if vecenv is None:
+        args['env']['eval'] = False
         vecenv = pufferlib.vector.make(
             make_env,
             env_kwargs=args['env'],

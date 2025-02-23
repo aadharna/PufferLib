@@ -101,8 +101,7 @@ class PufferGrid(pufferlib.PufferEnv):
                 if info:
                     info[0]['tasks'] = task_result
                 else:
-                    info.append({'tasks': task_result}) 
-                # info.append({done_ids[i]: reward_of_done[i] for i in range(len(reward_of_done))})
+                    info.append({'tasks': task_result})
 
         self.tick += 1
         return (self.observations, self.rewards,
