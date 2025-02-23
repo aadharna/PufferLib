@@ -81,14 +81,6 @@ class PufferGrid(pufferlib.PufferEnv):
         self.float_actions[:] = actions
         self.c_envs.step()
 
-        if self.eval:
-            # catch outcomes
-            rollout_done = any(self.terminals)
-            reward_of_done = self.rewards[self.terminals]
-            if rollout_done and len(reward_of_done) > 0:
-                # get the map id / seed of the terminal env
-                pass
-
         # from pdb import set_trace as T
         # if any(self.terminals):
         #     T()
@@ -98,6 +90,19 @@ class PufferGrid(pufferlib.PufferEnv):
             log = self.c_envs.log()
             if log['episode_length'] > 0:
                info.append(log)
+
+        if self.eval:
+            # catch outcomes
+            rollout_done = any(self.terminals)
+            reward_of_done = self.rewards[self.terminals]
+            done_ids = self.active_ids[self.terminals].astype(int)
+            if rollout_done:
+                task_result = {done_ids[i]: reward_of_done[i] for i in range(len(reward_of_done))}
+                if info:
+                    info[0]['tasks'] = task_result
+                else:
+                    info.append({'tasks': task_result}) 
+                # info.append({done_ids[i]: reward_of_done[i] for i in range(len(reward_of_done))})
 
         self.tick += 1
         return (self.observations, self.rewards,

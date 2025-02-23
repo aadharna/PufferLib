@@ -100,8 +100,7 @@ cdef class CGrid:
         self.levels = <State*> calloc(num_maps, sizeof(State))
         self.envs = <Grid*> calloc(num_envs, sizeof(Grid))
         self.logs = allocate_logbuffer(LOG_BUFFER_SIZE)
-        self.map_idxs = <float*> calloc(num_envs, sizeof(float)) # active_ids
-        # self.map_idxs = active_ids
+        self.map_idxs = &active_ids[0]
 
         cdef int i
         for i in range(num_envs):

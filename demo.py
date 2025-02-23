@@ -558,7 +558,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         clean_pufferl.train(data)
         # every 5M steps, generate a new sampling vector
         # let it burn in for 10M steps
-        if data.global_step - prev_steps > 5_000_000 and data.global_step > 10_000_000:
+        if data.global_step - prev_steps > 1_000_000 and data.global_step > 3_000_000:
             prev_steps = data.global_step
             # continue to evaluate until we have data from each map
             # ...
