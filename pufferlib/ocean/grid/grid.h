@@ -440,6 +440,7 @@ bool step(Grid* env) {
 
     env->log.episode_length += 1;
     if (env->log.episode_length >= env->horizon) {
+        env->dones[0] = 1;
         done = true;
     }
 
