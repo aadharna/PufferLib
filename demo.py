@@ -516,6 +516,18 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             overwork=args['vec_overwork'],
             backend=vec,
         )
+        args['env']['eval'] = True
+        eval_vecenv = pufferlib.vector.make(
+            make_env,
+            env_kwargs=args['env'],
+            num_envs=args['train']['num_envs'],
+            num_workers=args['train']['num_workers'],
+            batch_size=args['train']['env_batch_size'],
+            zero_copy=args['train']['zero_copy'],
+            overwork=args['vec_overwork'],
+            backend=vec,
+        )
+        # T()
 
     policy = make_policy(vecenv.driver_env, policy_cls, rnn_cls, args)
 
@@ -538,9 +550,20 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     train_config = pufferlib.namespace(**args['train'], env=env_name,
         exp_id=args['exp_id'] or env_name + '-' + str(uuid.uuid4())[:8])
     data = clean_pufferl.create(train_config, vecenv, policy, wandb=wandb, neptune=neptune)
+    eval_data = clean_pufferl.create(train_config, eval_vecenv, policy, wandb=wandb, neptune=neptune)    
+    
+    prev_steps = 0
     while data.global_step < train_config.total_timesteps:
         clean_pufferl.evaluate(data)
         clean_pufferl.train(data)
+        # every 5M steps, generate a new sampling vector
+        # let it burn in for 10M steps
+        if data.global_step - prev_steps > 5_000_000 and data.global_step > 10_000_000:
+            prev_steps = data.global_step
+            # continue to evaluate until we have data from each map
+            # ...
+            eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+            T()
 
     steps_evaluated = 0
     cost = data.profile.uptime
@@ -573,6 +596,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     '''
 
     clean_pufferl.close(data)
+    clean_pufferl.close(eval_data)
     return score, cost, elos, vecenv
 
 if __name__ == '__main__':
@@ -581,7 +605,7 @@ if __name__ == '__main__':
         ' demo options. Shows valid args for your env and policy',
         formatter_class=RichHelpFormatter, add_help=False)
     parser.add_argument('--env', '--environment', type=str,
-        default='puffer_squared', help='Name of specific environment to run')
+        default='puffer_grid', help='Name of specific environment to run')
     parser.add_argument('--mode', type=str, default='train',
         choices='train eval evaluate sweep sweep-carbs sweep-neocarbs test-random test-carbs test-neocarbs autotune profile'.split())
     parser.add_argument('--vec', '--vector', '--vectorization', type=str,
@@ -657,6 +681,8 @@ if __name__ == '__main__':
     env_module = importlib.import_module(module_name)
 
     make_env = env_module.env_creator(env_name)
+    from pdb import set_trace as T
+    T()
     policy_cls = getattr(env_module.torch, args['base']['policy_name'])
     
     rnn_name = args['base']['rnn_name']

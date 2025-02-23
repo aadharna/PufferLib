@@ -65,6 +65,7 @@ void add_log(LogBuffer* logs, Log* log) {
         return;
     }
     logs->logs[logs->idx] = *log;
+    //TODO: START HERE
     logs->idx += 1;
     //printf("Log: %f, %f, %f\n", log->episode_return, log->episode_length, log->score);
 }
@@ -327,6 +328,7 @@ int move_to(Grid* env, int agent_idx, float y, float x) {
     if (dest == WALL) {
         return 1;
     } else if (dest == REWARD || dest == GOAL) {
+        // I guess I can get task succes if reward == done in the buffers? I just need task id
         env->rewards[agent_idx] = 1.0;
         env->dones[agent_idx] = 1;
         env->log.episode_return += 1.0;

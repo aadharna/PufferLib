@@ -46,7 +46,8 @@ from pufferlib.ocean.grid.cy_grid import CGrid
 class PufferGrid(pufferlib.PufferEnv):
     def __init__(self, render_mode='raylib', vision_range=5,
             num_envs=4096, num_maps=1000, max_map_size=9,
-            report_interval=128, buf=None):
+            report_interval=128, buf=None, eval=False):
+        self.eval = eval
         self.obs_size = 2*vision_range + 1
         self.single_observation_space = gymnasium.spaces.Box(low=0, high=255,
             shape=(self.obs_size*self.obs_size,), dtype=np.uint8)
@@ -64,8 +65,9 @@ class PufferGrid(pufferlib.PufferEnv):
         self.ema_tsr = np.zeros(num_maps)
         self.p_fast = np.zeros(num_maps)
         self.p_slow = np.zeros(num_maps)
+        self.active_ids = np.zeros(num_envs).astype(np.float32)
         # self.lp = BiDirectionalLP(num_maps)
-        self.c_envs = CGrid(self.observations, self.float_actions, self.map_seeds, self.outcomes,
+        self.c_envs = CGrid(self.observations, self.float_actions, self.map_seeds, self.active_ids,
             self.rewards, self.terminals, num_envs, num_maps, max_map_size)
         # breakpoint()
         pass
@@ -79,6 +81,18 @@ class PufferGrid(pufferlib.PufferEnv):
         self.float_actions[:] = actions
         self.c_envs.step()
 
+        if self.eval:
+            # catch outcomes
+            rollout_done = any(self.terminals)
+            reward_of_done = self.rewards[self.terminals]
+            if rollout_done and len(reward_of_done) > 0:
+                # get the map id / seed of the terminal env
+                pass
+
+        # from pdb import set_trace as T
+        # if any(self.terminals):
+        #     T()
+        
         info = []
         if self.tick % self.report_interval == 0:
             log = self.c_envs.log()

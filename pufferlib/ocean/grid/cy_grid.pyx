@@ -87,8 +87,9 @@ cdef class CGrid:
         int num_envs
         int num_maps
         int max_size
+        float* map_idxs
 
-    def __init__(self, unsigned char[:, :] observations, float[:] actions, float[:] difficulties, float[:] outcomes,
+    def __init__(self, unsigned char[:, :] observations, float[:] actions, float[:] difficulties, float[:] active_ids,
             float[:] rewards, unsigned char[:] terminals, int num_envs, int num_maps,
             int max_size):
 
@@ -99,6 +100,8 @@ cdef class CGrid:
         self.levels = <State*> calloc(num_maps, sizeof(State))
         self.envs = <Grid*> calloc(num_envs, sizeof(Grid))
         self.logs = allocate_logbuffer(LOG_BUFFER_SIZE)
+        self.map_idxs = <float*> calloc(num_envs, sizeof(float)) # active_ids
+        # self.map_idxs = active_ids
 
         cdef int i
         for i in range(num_envs):
@@ -128,10 +131,12 @@ cdef class CGrid:
             init_state(&self.levels[i], max_size, 1)
             get_state(&self.envs[0], &self.levels[i])
 
-    def reset(self):
+    def reset(self): # , int[:] idxs
         cdef int i, idx
         for i in range(self.num_envs):
             idx = rand() % self.num_maps
+            self.map_idxs[i] = idx
+            # idx = idxs[i]
             reset(&self.envs[i], i)
             set_state(&self.envs[i], &self.levels[idx])
 
@@ -144,6 +149,7 @@ cdef class CGrid:
             done = step(&self.envs[i])
             if done:
                 idx = rand() % self.num_maps
+                self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
                 set_state(&self.envs[i], &self.levels[idx])
 
