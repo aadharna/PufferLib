@@ -133,9 +133,10 @@ cdef class CGrid:
     def reset(self): # , int[:] idxs
         cdef int i, idx
         for i in range(self.num_envs):
+            # replace this rand call with a random choice following
+            #  a passed in distirbution vector over the maps
             idx = rand() % self.num_maps
             self.map_idxs[i] = idx
-            # idx = idxs[i]
             reset(&self.envs[i], i)
             set_state(&self.envs[i], &self.levels[idx])
 
@@ -147,6 +148,8 @@ cdef class CGrid:
         for i in range(self.num_envs):
             done = step(&self.envs[i])
             if done:
+                # replace this rand call with a random choice following
+                #  a passed in distirbution vector over the maps
                 idx = rand() % self.num_maps
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
