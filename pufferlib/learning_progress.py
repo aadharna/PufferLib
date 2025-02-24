@@ -5,15 +5,16 @@ from collections import defaultdict
 
 class BidirectionalLearningProgess:
     def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05):
-        self.max_num_levels = max_num_levels
+        self.num_tasks = max_num_levels
         self.ema_alpha = ema_alpha
         self.p_theta = p_theta
         self.outcomes = {}
         for i in range(max_num_levels):
             self.outcomes[i] = []
         self.ema_tsr = None
-        self.p_fast = None
-        self.p_slow = None
+        self._p_fast = None
+        self._p_slow = None
+        self._p_true = None
         self.random_baseline = None
         self.task_success_rate = None
         self.task_sampled_tracker = []
@@ -23,7 +24,7 @@ class BidirectionalLearningProgess:
         self.collecting = True
 
     def _update(self):
-        task_success_rates = np.array([np.mean(self.outcomes[i]) for i in range(self.max_num_levels)])
+        task_success_rates = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
 
         if self.random_baseline is None:
             # Assume that any perfect success rate is actually 75% due to evaluation precision.
@@ -63,8 +64,10 @@ class BidirectionalLearningProgess:
                     self.outcomes[task_id].append(res)
 
         self.task_sampled_tracker = [int(bool(o)) for k, o in self.outcomes.items()]
-        if sum(self.task_sampled_tracker) >= self.max_num_levels:
-            self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.max_num_levels)])
+        print(f'data collected on {sum(self.task_sampled_tracker)} / {self.num_tasks} tasks')
+        if sum(self.task_sampled_tracker) == self.num_tasks:
+            # T()
+            self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
             self.collecting = False
             self.task_sampled_tracker = []
     
@@ -121,10 +124,10 @@ class BidirectionalLearningProgess:
         self._stale_dist = False
         # clear the outcome dict
         self.outcomes = defaultdict(list)
-        for i in range(self.max_num_levels):
+        for i in range(self.num_tasks):
             self.outcomes[i] = []
         self.collecting = True
-        return task_dist
+        return task_dist.astype(np.float32)
     
     def calculate_dist(self):
         self._update()

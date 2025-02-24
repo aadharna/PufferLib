@@ -41,8 +41,8 @@ class PufferGrid(pufferlib.PufferEnv):
 
     def step(self, actions):
         self.float_actions[:] = actions
-        if self.sampling_dist.sum() > 1:
-            T()
+        # if self.sampling_dist.sum() > 1:
+        #     T()
         self.c_envs.step(self.sampling_dist)
         
         info = []

@@ -557,7 +557,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     eval_data = clean_pufferl.create(train_config, eval_vecenv, policy, wandb=wandb, neptune=neptune)    
     
     prev_steps = 0
-    window = args['env']['num_maps'] // 400
+    window = args['env']['num_maps'] // 40
     loops = 0
     while lp.continue_collecting():
         _sampling_dist = eval_data.vecenv.sampling_dist
@@ -565,14 +565,16 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         sampling_dist[loops*window:(loops+1)*window] = 1 / window
         # make sure the sampling distribution sums to 1
         if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-            sampling_dist[loops*window:(loops+1)*window] = 1 / (args['env']['num_maps'] - loops*window)
+            sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+            sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
         eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
         loops += 1
-        while sum(lp.task_sampled_tracker) < (loops*window) - 1:
+        while sum(lp.task_sampled_tracker) < min((loops*window), args['env']['num_maps']) and lp.collecting:
             eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
             lp.collect_data(eval_infos)
         eval_data.stats.clear()
     lp_dist = lp.calculate_dist()
+    data.vecenv.sampling_dist = lp_dist
     # todo add logging of task success rates
     # todo add logging of learning progress
 
@@ -581,11 +583,10 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         clean_pufferl.train(data)
         # every 5M steps, generate a new sampling vector
         # let it burn in for 5M steps
+        loops = 0
         if data.global_step - prev_steps > 5_000_000 and data.global_step > 5_000_000:
             prev_steps = data.global_step
             # continue to evaluate until we have data from each map
-            # ...
-            loops = 0
             while lp.continue_collecting():
                 # eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
                 # T()
@@ -594,16 +595,22 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
                 sampling_dist[loops*window:(loops+1)*window] = 1 / window
                 # make sure the sampling distribution sums to 1
                 if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-                    sampling_dist[loops*window:(loops+1)*window] = 1 / (args['env']['num_maps'] - loops*window)
+                    if sampling_dist[loops*window:].shape[0] == 0:
+                        T()
+                        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+                        sampling_dist[loops*window:] = 1
+                    else:
+                        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+                        sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
                 eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
                 loops += 1
-                while sum(lp.task_sampled_tracker) < (loops*window) - 1:
+                while sum(lp.task_sampled_tracker) < min((loops*window), args['env']['num_maps']) and lp.collecting:
                     eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
                     lp.collect_data(eval_infos)
                 # T()
                 eval_data.stats.clear()
-        lp_dist = lp.calculate_dist()
-        data.vecenv.sampling_dist = lp_dist
+            lp_dist = lp.calculate_dist()
+            data.vecenv.sampling_dist = lp_dist
 
     steps_evaluated = 0
     cost = data.profile.uptime
