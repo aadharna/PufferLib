@@ -53,7 +53,8 @@ def init_wandb(args, name, id=None, resume=True, tag=None):
 def init_neptune(args, name, id=None, resume=True, tag=None):
     import neptune
     run = neptune.init_run(
-        project="pufferai/ablations",
+        project="aadharna/Grid-LearningProgress",
+        api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIzNTMzNTE0Zi1kOGNlLTQ4ZmUtYmI0Ny1iZTQ4NzQ2OTJhYmYifQ==",
         capture_hardware_metrics=False,
         capture_stdout=False,
         capture_stderr=False,
@@ -557,7 +558,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     eval_data = clean_pufferl.create(train_config, eval_vecenv, policy, wandb=wandb, neptune=neptune)    
     
     prev_steps = 0
-    window = args['env']['num_maps'] // 40
+    window = args['env']['num_maps'] // 100
     loops = 0
     while lp.continue_collecting():
         _sampling_dist = eval_data.vecenv.sampling_dist
@@ -569,7 +570,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
         eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
         loops += 1
-        while sum(lp.task_sampled_tracker) < min((loops*window), args['env']['num_maps']) and lp.collecting:
+        while not all(lp.task_sampled_tracker[(loops-1)*window:loops*window]) and lp.collecting:
             eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
             lp.collect_data(eval_infos)
         eval_data.stats.clear()
@@ -604,13 +605,19 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
                         sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
                 eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
                 loops += 1
-                while sum(lp.task_sampled_tracker) < min((loops*window), args['env']['num_maps']) and lp.collecting:
+                while not all(lp.task_sampled_tracker[(loops-1)*window:loops*window]) and lp.collecting:
                     eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
                     lp.collect_data(eval_infos)
                 # T()
                 eval_data.stats.clear()
             lp_dist = lp.calculate_dist()
             data.vecenv.sampling_dist = lp_dist
+        log_data = dict(
+            task_success_rate=np.mean(lp.task_success_rate),
+        )
+        if args['neptune']:
+            for k, v in log_data.items():
+                neptune[k].append(v)
 
     steps_evaluated = 0
     cost = data.profile.uptime
