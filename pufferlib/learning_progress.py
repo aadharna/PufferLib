@@ -69,7 +69,7 @@ class BidirectionalLearningProgess:
             # T()
             self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
             self.collecting = False
-            self.task_sampled_tracker = max_num_levels * [0]
+            self.task_sampled_tracker = self.max_num_levels * [0]
     
     def continue_collecting(self):
         return self.collecting
