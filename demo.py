@@ -13,6 +13,7 @@ import pufferlib
 import pufferlib.utils
 import pufferlib.vector
 import pufferlib.cleanrl
+from pufferlib.learning_progress import BidirectionalLearningProgess
 
 from rich_argparse import RichHelpFormatter
 from rich.console import Console
@@ -530,6 +531,8 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         )
         # T()
 
+    lp = BidirectionalLearningProgess(args['env']['num_maps'])
+    
     policy = make_policy(vecenv.driver_env, policy_cls, rnn_cls, args)
 
     '''
@@ -554,17 +557,46 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     eval_data = clean_pufferl.create(train_config, eval_vecenv, policy, wandb=wandb, neptune=neptune)    
     
     prev_steps = 0
+    window = args['env']['num_maps'] // 400
+    loops = 0
+    while lp.continue_collecting():
+        # eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+        # T()
+        _sampling_dist = eval_data.vecenv.sampling_dist
+        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+        sampling_dist[loops*window:(loops+1)*window] = 1 / window
+        eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
+        loops += 1
+        while sum(lp.num_tsr) < (loops*window) - 1:
+            eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+            lp.collect_data(eval_infos)
+        eval_data.stats.clear()
+    lp_dist = lp.calculate_dist()
+
     while data.global_step < train_config.total_timesteps:
         clean_pufferl.evaluate(data)
         clean_pufferl.train(data)
         # every 5M steps, generate a new sampling vector
-        # let it burn in for 10M steps
-        if data.global_step - prev_steps > 1_000_000 and data.global_step > 3_000_000:
+        # let it burn in for 5M steps
+        if data.global_step - prev_steps > 5_000_000 and data.global_step > 5_000_000:
             prev_steps = data.global_step
             # continue to evaluate until we have data from each map
             # ...
-            eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
-            T()
+            while lp.continue_collecting():
+                # eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+                # T()
+                _sampling_dist = eval_data.vecenv.sampling_dist
+                sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+                sampling_dist[loops*window:(loops+1)*window] = 1 / window
+                eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
+                loops += 1
+                while sum(lp.num_tsr) < (loops*window) - 1:
+                    eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+                    lp.collect_data(eval_infos)
+                # T()
+                eval_data.stats.clear()
+        lp_dist = lp.calculate_dist()
+        data.vecenv.sampling_dist = lp_dist
 
     steps_evaluated = 0
     cost = data.profile.uptime
@@ -683,7 +715,7 @@ if __name__ == '__main__':
 
     make_env = env_module.env_creator(env_name)
     from pdb import set_trace as T
-    T()
+    # T()
     policy_cls = getattr(env_module.torch, args['base']['policy_name'])
     
     rnn_name = args['base']['rnn_name']
