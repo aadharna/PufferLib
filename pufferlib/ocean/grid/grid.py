@@ -25,12 +25,6 @@ class PufferGrid(pufferlib.PufferEnv):
         self.float_actions = np.zeros_like(self.actions).astype(np.float32)
         # parameters for learning progress
         self.map_seeds = np.linspace(0, 1, num_maps).astype(np.float32)
-        self.ema_alpha = 0.001
-        self.p_theta = 0.05
-        self.outcomes = np.zeros(num_maps).astype(np.float32)
-        self.ema_tsr = np.zeros(num_maps)
-        self.p_fast = np.zeros(num_maps)
-        self.p_slow = np.zeros(num_maps)
         self.active_ids = np.zeros(num_envs).astype(np.float32)
         self.uniform_dist = np.ones(num_maps).astype(np.float32) / num_maps
         self.sampling_dist = np.copy(self.uniform_dist)
@@ -39,28 +33,6 @@ class PufferGrid(pufferlib.PufferEnv):
             self.rewards, self.terminals, num_envs, num_maps, max_map_size)
         # breakpoint()
         pass
-        # from random import random
-        # cdef int i, j, idx
-        # cdef double u, cumulative
-        # cdef double s = 0.0
-
-        # # (Optional) Check or normalize distribution
-        # for j in range(self.num_maps):
-        #     s += p[j]
-        # if abs(s - 1.0) > 1e-6:
-        #     raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
-
-        # for i in range(self.num_envs):
-        #     u = random()
-        #     cumulative = 0.0
-        #     for idx in range(self.num_maps):
-        #         cumulative += p[idx]
-        #         if u < cumulative:
-        #             break
-
-        #     self.map_idxs[i] = idx
-        #     reset(&self.envs[i], i)
-        #     set_state(&self.envs[i], &self.levels[idx])
 
     def reset(self, seed=None):
         self.tick = 0

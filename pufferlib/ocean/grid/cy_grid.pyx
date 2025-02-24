@@ -77,6 +77,7 @@ cdef extern from "grid.h":
 
 import numpy as np
 cimport numpy as cnp
+from random import random
 
 cdef class CGrid:
     cdef:
@@ -131,13 +132,24 @@ cdef class CGrid:
             get_state(&self.envs[0], &self.levels[i])
 
     def reset(self, float[:] p):
-        cdef int i, idx
+        cdef int i, j, idx
+        cdef double u, cumulative
+        cdef double s = 0.0
+
+        # (Optional) Check or normalize distribution
+        for j in range(self.num_maps):
+            s += p[j]
+        if abs(s - 1.0) > 1e-6:
+            raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
+
         for i in range(self.num_envs):
-            # replace this rand call with a random choice following
-            #  a passed in distirbution vector over the maps
-            idx = rand() % self.num_maps
-            # print(&p[0])
-            # idx = np.random.choice(self.num_maps, p=p)
+            u = random()
+            cumulative = 0.0
+            for idx in range(self.num_maps):
+                cumulative += p[idx]
+                if u < cumulative:
+                    break
+
             self.map_idxs[i] = idx
             reset(&self.envs[i], i)
             set_state(&self.envs[i], &self.levels[idx])
@@ -171,17 +183,6 @@ cdef class CGrid:
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
                 set_state(&self.envs[i], &self.levels[idx])
- 
-        # for i in range(self.num_envs):
-        #     done = step(&self.envs[i])
-        #     if done:
-        #         # replace this rand call with a random choice following
-        #         #  a passed in distirbution vector over the maps
-        #         idx = rand() % self.num_maps
-        #         # idx = np.random.choice(self.num_maps, p=p)
-        #         self.map_idxs[i] = idx
-        #         reset(&self.envs[i], i)
-        #         set_state(&self.envs[i], &self.levels[idx])
 
     def render(self, int cell_size=16):
         if self.client == NULL:
