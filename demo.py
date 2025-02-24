@@ -573,6 +573,8 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             lp.collect_data(eval_infos)
         eval_data.stats.clear()
     lp_dist = lp.calculate_dist()
+    # todo add logging of task success rates
+    # todo add logging of learning progress
 
     while data.global_step < train_config.total_timesteps:
         clean_pufferl.evaluate(data)
