@@ -16,13 +16,13 @@ class BidirectionalLearningProgess:
         self.p_slow = None
         self.random_baseline = None
         self.task_success_rate = None
-        self.num_tsr = []
+        self.task_sampled_tracker = []
 
         # should we continue collecting 
         #  or if we have enough data to update the learning progress
         self.collecting = True
 
-    def update(self):
+    def _update(self):
         task_success_rates = np.array([np.mean(self.outcomes[i]) for i in range(self.max_num_levels)])
 
         if self.random_baseline is None:
@@ -62,11 +62,11 @@ class BidirectionalLearningProgess:
                 for res in v:
                     self.outcomes[task_id].append(res)
 
-        self.num_tsr = [int(bool(o)) for k, o in self.outcomes.items()]
-        if sum(self.num_tsr) >= self.max_num_levels:
+        self.task_sampled_tracker = [int(bool(o)) for k, o in self.outcomes.items()]
+        if sum(self.task_sampled_tracker) >= self.max_num_levels:
             self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.max_num_levels)])
             self.collecting = False
-            self.num_tsr = []
+            self.task_sampled_tracker = []
     
     def continue_collecting(self):
         return self.collecting
@@ -92,7 +92,7 @@ class BidirectionalLearningProgess:
         """ Sigmoid function for reweighting the learning progress."""
         return 1 / (1 + np.exp(-x))
 
-    def sample_distribution(self):
+    def _sample_distribution(self):
         """ Return sampling distribution over the task space based on the learning progress."""
         if not self._stale_dist:
             # No changes since distribution was last computed
@@ -127,5 +127,5 @@ class BidirectionalLearningProgess:
         return task_dist
     
     def calculate_dist(self):
-        self.update()
-        return self.sample_distribution()
+        self._update()
+        return self._sample_distribution()

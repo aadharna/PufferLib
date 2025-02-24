@@ -560,14 +560,15 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     window = args['env']['num_maps'] // 400
     loops = 0
     while lp.continue_collecting():
-        # eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
-        # T()
         _sampling_dist = eval_data.vecenv.sampling_dist
         sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
         sampling_dist[loops*window:(loops+1)*window] = 1 / window
+        # make sure the sampling distribution sums to 1
+        if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
+            sampling_dist[loops*window:(loops+1)*window] = 1 / (args['env']['num_maps'] - loops*window)
         eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
         loops += 1
-        while sum(lp.num_tsr) < (loops*window) - 1:
+        while sum(lp.task_sampled_tracker) < (loops*window) - 1:
             eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
             lp.collect_data(eval_infos)
         eval_data.stats.clear()
@@ -582,15 +583,19 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             prev_steps = data.global_step
             # continue to evaluate until we have data from each map
             # ...
+            loops = 0
             while lp.continue_collecting():
                 # eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
                 # T()
                 _sampling_dist = eval_data.vecenv.sampling_dist
                 sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
                 sampling_dist[loops*window:(loops+1)*window] = 1 / window
+                # make sure the sampling distribution sums to 1
+                if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
+                    sampling_dist[loops*window:(loops+1)*window] = 1 / (args['env']['num_maps'] - loops*window)
                 eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
                 loops += 1
-                while sum(lp.num_tsr) < (loops*window) - 1:
+                while sum(lp.task_sampled_tracker) < (loops*window) - 1:
                     eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
                     lp.collect_data(eval_infos)
                 # T()
