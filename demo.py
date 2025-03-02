@@ -574,6 +574,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
             lp.collect_data(eval_infos)
         eval_data.stats.clear()
+        eval_data.experience.sort_keys = []
     lp_dist = lp.calculate_dist()
     data.vecenv.sampling_dist = lp_dist
     # todo add logging of task success rates
