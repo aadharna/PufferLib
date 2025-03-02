@@ -575,6 +575,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             lp.collect_data(eval_infos)
         eval_data.stats.clear()
         eval_data.experience.sort_keys = []
+
     lp_dist = lp.calculate_dist()
     data.vecenv.sampling_dist = lp_dist
     # todo add logging of task success rates
@@ -611,6 +612,8 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
                     lp.collect_data(eval_infos)
                 # T()
                 eval_data.stats.clear()
+                eval_data.experience.sort_keys = []
+
             lp_dist = lp.calculate_dist()
             data.vecenv.sampling_dist = lp_dist
         log_data = dict(
