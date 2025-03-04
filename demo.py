@@ -582,7 +582,9 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     # todo add logging of learning progress
 
     while data.global_step < train_config.total_timesteps:
+        data.vecenv.sampling_dist = data.vecenv.uniform_dist
         clean_pufferl.evaluate(data)
+        data.vecenv.sampling_dist = lp_dist
         clean_pufferl.train(data)
         # every 5M steps, generate a new sampling vector
         # let it burn in for 5M steps
@@ -616,8 +618,10 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
 
             lp_dist = lp.calculate_dist()
             data.vecenv.sampling_dist = lp_dist
+        
         log_data = dict(
             task_success_rate=np.mean(lp.task_success_rate),
+            mean_evals_per_task=lp.mean_samples_per_eval[-1],
         )
         if args['neptune']:
             for k, v in log_data.items():

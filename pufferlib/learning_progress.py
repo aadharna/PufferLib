@@ -18,6 +18,7 @@ class BidirectionalLearningProgess:
         self.random_baseline = None
         self.task_success_rate = None
         self.task_sampled_tracker = max_num_levels * [0]
+        self.mean_samples_per_eval = []
 
         # should we continue collecting 
         #  or if we have enough data to update the learning progress
@@ -68,6 +69,7 @@ class BidirectionalLearningProgess:
         if sum(self.task_sampled_tracker) == self.num_tasks:
             # T()
             self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
+            self.mean_samples_per_eval.append(np.mean([len(self.outcomes[i]) for i in range(self.num_tasks)]))
             self.collecting = False
             self.task_sampled_tracker = self.num_tasks * [0]
     
