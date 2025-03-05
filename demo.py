@@ -582,14 +582,14 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     # todo add logging of learning progress
 
     while data.global_step < train_config.total_timesteps:
-        data.vecenv.sampling_dist = data.vecenv.uniform_dist
+        # data.vecenv.sampling_dist = data.vecenv.uniform_dist
         clean_pufferl.evaluate(data)
-        data.vecenv.sampling_dist = lp_dist
+        # data.vecenv.sampling_dist = lp_dist
         clean_pufferl.train(data)
         # every 5M steps, generate a new sampling vector
         # let it burn in for 5M steps
         loops = 0
-        if data.global_step - prev_steps > 5_000_000 and data.global_step > 5_000_000:
+        if data.global_step - prev_steps > 10_000_000 and data.global_step > 5_000_000:
             prev_steps = data.global_step
             # continue to evaluate until we have data from each map
             while lp.continue_collecting():
