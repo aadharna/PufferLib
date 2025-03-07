@@ -24,7 +24,7 @@ import signal # Aggressively exit on ctrl+c
 signal.signal(signal.SIGINT, lambda sig, frame: os._exit(0))
 
 import clean_pufferl
-   
+
 def make_policy(env, policy_cls, rnn_cls, args):
     policy = policy_cls(env, **args['policy'])
     if rnn_cls is not None:
@@ -143,7 +143,7 @@ def sample_hyperparameters(sweep_config):
 #     LogSpace,
 #     LogitSpace,
 # )
-# 
+#
 # class PufferCarbs:
 #     def __init__(self,
 #             sweep_config: dict,
@@ -201,7 +201,7 @@ def sample_hyperparameters(sweep_config):
 #         if any(isinstance(param[k], dict) for k in param):
 #             param_spaces[name] = _carbs_params_from_puffer_sweep(param)
 #             continue
- 
+
 #         assert 'distribution' in param
 #         distribution = param['distribution']
 #         search_center = param['mean']
@@ -251,7 +251,7 @@ def sample_hyperparameters(sweep_config):
 #         carbs.observe(score=target, cost=uptime)
 
 
- 
+
 def sweep_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
     target_metric = args['sweep']['metric']['name']
     max_suggestion_cost = args['base']['max_suggestion_cost']
@@ -382,13 +382,13 @@ def test_random_search(args, env_name, make_env, policy_cls, rnn_cls):
 
     np.save(args['data_path']+'.npy', {'scores': scores, 'costs': costs, 'hypers': hyper_ary})
 
-    ''' 
+    '''
     import plotly.graph_objects as go
     t = list(range(len(scores)))
     fig = go.Figure(data=go.Scatter(x=t, y=scores, mode='markers'))
     fig.update_layout(title='CARBS Synthetic Test', xaxis_title='Index', yaxis_title='Value')
     fig.show()
-    ''' 
+    '''
 
 
 # def test_carbs(args, env_name, make_env, policy_cls, rnn_cls):
@@ -406,7 +406,7 @@ def test_random_search(args, env_name, make_env, policy_cls, rnn_cls):
 #         random.seed(seed)
 #         np.random.seed(seed)
 #         torch.manual_seed(seed)
- 
+
 #         carbs.suggest(args)
 
 #         # Optimal params
@@ -433,7 +433,7 @@ def test_random_search(args, env_name, make_env, policy_cls, rnn_cls):
 #         neptune['environment/uptime'].append(cost)
 #         neptune.stop()
 #         '''
- 
+
 #         #stats, uptime, _, _ = train(args, make_env, policy_cls, rnn_cls)
 #         carbs.observe(score=score, cost=cost)
 
@@ -470,6 +470,7 @@ def test_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
+
         hypers = carbs.suggest()
         score, cost = synthetic_percentile_task(hypers)
         carbs.observe(score=score, cost=cost)
@@ -485,7 +486,6 @@ def test_neocarbs(args, env_name, make_env, policy_cls, rnn_cls):
 
 def sweep(args, env_name, make_env, policy_cls, rnn_cls):
     target_metric = args['sweep']['metric']['name']
-    # target_metric = 'environment/score'
     for i in range(args['max_runs']):
         np.random.seed(int(time.time()))
         random.seed(int(time.time()))
@@ -532,7 +532,8 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         )
         # T()
 
-    lp = BidirectionalLearningProgess(args['env']['num_maps'])
+    # lp = BidirectionalLearningProgess(args['env']['num_maps'])
+
     policy = make_policy(vecenv.driver_env, policy_cls, rnn_cls, args)
 
     '''
@@ -546,7 +547,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     wandb = None
     if args['neptune']:
         neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
-        neptune["sys/group_tags"].add(['binom_lp'])
+        neptune["sys/group_tags"].add(['binom_no_lp'])
         for k, v in pufferlib.utils.unroll_nested_dict(args):
             neptune[k].append(v)
     elif args['wandb']:
@@ -557,81 +558,9 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     data = clean_pufferl.create(train_config, vecenv, policy, wandb=wandb, neptune=neptune)
     eval_data = clean_pufferl.create(train_config, eval_vecenv, policy, wandb=wandb, neptune=neptune)
 
-    prev_steps = 0
-    window = args['env']['num_maps'] // 200
-    loops = 0
-    while lp.continue_collecting():
-        _sampling_dist = eval_data.vecenv.sampling_dist
-        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-        sampling_dist[loops*window:(loops+1)*window] = 1 / window
-        # make sure the sampling distribution sums to 1
-        if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-            sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-            sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
-        eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
-        loops += 1
-        while not all(lp.task_sampled_tracker[(loops-1)*window:loops*window]) and lp.collecting:
-            eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
-            lp.collect_data(eval_infos)
-
-        eval_data.stats.clear()
-        eval_data.experience.sort_keys = []
-
-    lp_dist = lp.calculate_dist()
-    data.vecenv.sampling_dist = lp_dist
-    # todo add logging of task success rates
-    # todo add logging of learning progress
-
-    lps = []
-    # train_config.total_timesteps = 250_000_000
     while data.global_step < train_config.total_timesteps:
-        # data.vecenv.sampling_dist = data.vecenv.uniform_dist
         clean_pufferl.evaluate(data)
-        # data.vecenv.sampling_dist = lp_dist
         clean_pufferl.train(data)
-        # every 5M steps, generate a new sampling vector
-        # let it burn in for 5M steps
-        loops = 0
-        if data.global_step - prev_steps > 15_000_000 and data.global_step > 15_000_000:
-            prev_steps = data.global_step
-            # continue to evaluate until we have data from each map
-            while lp.continue_collecting():
-                # eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
-                # T()
-                _sampling_dist = eval_data.vecenv.sampling_dist
-                sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-                sampling_dist[loops*window:(loops+1)*window] = 1 / window
-                # make sure the sampling distribution sums to 1
-                if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-                    if sampling_dist[loops*window:].shape[0] == 0:
-                        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-                        sampling_dist[loops*window:] = 1
-                    else:
-                        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-                        sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
-                eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
-                loops += 1
-                while not all(lp.task_sampled_tracker[(loops-1)*window:loops*window]) and lp.collecting:
-                    eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
-                    lp.collect_data(eval_infos)
-                # T()
-                eval_data.stats.clear()
-                eval_data.experience.sort_keys = []
-
-            lp_dist = lp.calculate_dist()
-            data.vecenv.sampling_dist = lp_dist
-            lps.append(lp_dist)
-
-        log_data = dict(
-            task_success_rate=np.mean(lp.task_success_rate),
-            mean_evals_per_task=lp.mean_samples_per_eval[-1],
-         )
-
-        if args['neptune']:
-            for k, v in log_data.items():
-                neptune[k].append(v)
-        elif args['wandb']:
-            wandb.log(log_data)
 
     steps_evaluated = 0
     cost = data.profile.uptime
@@ -663,9 +592,6 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             wandb.log({'environment/elo': elos[model_name]})
     '''
 
-    # import pandas as pd
-    # df = pd.DataFrame(np.array(lps))
-    # df.to_csv('lp_dist.csv')
     clean_pufferl.close(data)
     clean_pufferl.close(eval_data)
     return score, cost, elos, vecenv
@@ -815,4 +741,3 @@ if __name__ == '__main__':
         from pstats import SortKey
         p = pstats.Stats('stats.profile')
         p.sort_stats(SortKey.TIME).print_stats(10)
-

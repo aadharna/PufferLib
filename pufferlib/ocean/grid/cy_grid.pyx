@@ -122,7 +122,12 @@ cdef class CGrid:
         cdef float difficulty
         cdef int size
         for i in range(num_maps):
-            size = np.random.randint(5, max_size)
+            if np.random.rand() < 0.2:
+                size = np.random.randint(5, max_size)
+            else:
+                size = max_size
+
+           # size = np.random.randint(5, max_size)
             if size % 2 == 0:
                 size -= 1
 
@@ -162,13 +167,13 @@ cdef class CGrid:
             int j
             double u, cumulative
             double s = 0.0
-        
+
         # (Optional) Check or normalize distribution
         for j in range(self.num_maps):
             s += p[j]
         if abs(s - 1.0) > 1e-6:
             raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
-        
+
         for i in range(self.num_envs):
             u = random()
             cumulative = 0.0
@@ -176,7 +181,7 @@ cdef class CGrid:
                 cumulative += p[idx]
                 if u < cumulative:
                     break
-        
+
         for i in range(self.num_envs):
             done = step(&self.envs[i])
             if done:
