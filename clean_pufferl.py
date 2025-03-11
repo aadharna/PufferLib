@@ -88,6 +88,12 @@ def evaluate(data):
         with profile.env:
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
             env_id = env_id.tolist()
+            # 1. add data from info into the LP
+            # 2. if we have enough data, update the LP distribution
+            # 3. either a) empty the LP cache or b) just the cache grow forever
+            # data.lp.add(info)
+            # if data.lp.full:
+            #     data.lp.update()
 
         with profile.eval_misc:
             data.global_step += sum(mask)
@@ -148,6 +154,10 @@ def evaluate(data):
     # TODO: Better way to enable multiple collects
     data.experience.ptr = 0
     data.experience.step = 0
+    # lp_dist = data.lp.calculate_dist()
+    # data.vecenv.sampling_dist = lp_dist
+    # infos['task_success_rate'] = np.mean(data.lp.task_success_rate)
+    # infos['mean_evals_per_task'] = np.mean(data.lp.mean_samples_per_eval)
     return data.stats, infos
 
 @pufferlib.utils.profile

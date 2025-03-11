@@ -51,17 +51,17 @@ class PufferGrid(pufferlib.PufferEnv):
             if log['episode_length'] > 0:
                info.append(log)
 
-        if self.eval:
-            # catch outcomes
-            rollout_done = any(self.terminals)
-            reward_of_done = self.rewards[self.terminals]
-            done_ids = self.active_ids[self.terminals].astype(int)
-            if rollout_done:
-                task_result = {done_ids[i]: reward_of_done[i] for i in range(len(reward_of_done))}
-                if info:
-                    info[0]['tasks'] = task_result
-                else:
-                    info.append({'tasks': task_result})
+        # if self.eval:
+        # catch outcomes
+        rollout_done = any(self.terminals)
+        reward_of_done = self.rewards[self.terminals]
+        done_ids = self.active_ids[self.terminals].astype(int)
+        if rollout_done:
+            task_result = {done_ids[i]: reward_of_done[i] for i in range(len(reward_of_done))}
+            if info:
+                info[0]['tasks'] = task_result
+            else:
+                info.append({'tasks': task_result})
 
         self.tick += 1
         return (self.observations, self.rewards,
