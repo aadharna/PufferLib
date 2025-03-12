@@ -165,7 +165,7 @@ def evaluate(data):
     data.experience.step = 0
     lp_dist = data.lp.calculate_dist()
     data.vecenv.sampling_dist = lp_dist
-    data.stats['task_success_rate'].append(np.mean(data.lp.task_success_rate))
+    data.stats['task_success_rate'].append(np.nanmean(data.lp.task_success_rate))
     data.stats['mean_evals_per_task'].append(data.lp.mean_samples_per_eval[-1])
     return data.stats, infos
 
