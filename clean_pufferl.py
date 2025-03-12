@@ -19,6 +19,8 @@ import pufferlib
 import pufferlib.utils
 import pufferlib.pytorch
 
+from pufferlib.learning_progress import BidirectionalLearningProgess
+
 torch.set_float32_matmul_precision('high')
 
 # Fast Cython GAE implementation
@@ -55,6 +57,8 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
 
     optimizer = torch.optim.Adam(policy.parameters(),
         lr=config.learning_rate, eps=1e-5)
+    
+    lp = BidirectionalLearningProgess(max_num_levels=config.num_maps)
 
     return pufferlib.namespace(
         config=config,
@@ -73,6 +77,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
         msg=msg,
         last_log_time=0,
         utilization=utilization,
+        lp=lp,
     )
 
 @pufferlib.utils.profile
@@ -88,12 +93,6 @@ def evaluate(data):
         with profile.env:
             o, r, d, t, info, env_id, mask = data.vecenv.recv()
             env_id = env_id.tolist()
-            # 1. add data from info into the LP
-            # 2. if we have enough data, update the LP distribution
-            # 3. either a) empty the LP cache or b) just the cache grow forever
-            # data.lp.add(info)
-            # if data.lp.full:
-            #     data.lp.update()
 
         with profile.eval_misc:
             data.global_step += sum(mask)
@@ -128,10 +127,17 @@ def evaluate(data):
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     infos[k].append(v)
+        
+        # 1. add data from info into the LP
+        # 2. update the LP cache and keep the last 25 samples per task
+        #    happens below
+        data.lp.collect_data(infos)
+        # if data.lp.full:
+        #     data.lp.update()
 
         with profile.env:
             data.vecenv.send(actions)
-
+    
     with profile.eval_misc:
         for k, v in infos.items():
             if '_map' in k:
@@ -142,6 +148,9 @@ def evaluate(data):
                     # TODO: Add neptune image logging
                     pass
 
+            if 'tasks' in k:
+                continue
+            
             if isinstance(v, np.ndarray):
                 v = v.tolist()
             try:
@@ -154,10 +163,10 @@ def evaluate(data):
     # TODO: Better way to enable multiple collects
     data.experience.ptr = 0
     data.experience.step = 0
-    # lp_dist = data.lp.calculate_dist()
-    # data.vecenv.sampling_dist = lp_dist
-    # infos['task_success_rate'] = np.mean(data.lp.task_success_rate)
-    # infos['mean_evals_per_task'] = np.mean(data.lp.mean_samples_per_eval)
+    lp_dist = data.lp.calculate_dist()
+    data.vecenv.sampling_dist = lp_dist
+    data.stats['task_success_rate'].append(np.mean(data.lp.task_success_rate))
+    data.stats['mean_evals_per_task'].append(data.lp.mean_samples_per_eval[-1])
     return data.stats, infos
 
 @pufferlib.utils.profile

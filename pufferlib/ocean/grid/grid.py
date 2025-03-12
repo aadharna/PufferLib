@@ -28,7 +28,6 @@ class PufferGrid(pufferlib.PufferEnv):
         self.active_ids = np.zeros(num_envs).astype(np.float32)
         self.uniform_dist = np.ones(num_maps).astype(np.float32) / num_maps
         self.sampling_dist = np.copy(self.uniform_dist)
-        # self.lp = BiDirectionalLP(num_maps)
         self.c_envs = CGrid(self.observations, self.float_actions, self.map_seeds, self.active_ids,
             self.rewards, self.terminals, num_envs, num_maps, max_map_size)
         # breakpoint()

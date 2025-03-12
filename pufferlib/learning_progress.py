@@ -3,6 +3,8 @@ from pdb import set_trace as T
 import numpy as np
 from collections import defaultdict
 
+import pufferlib
+
 class BidirectionalLearningProgess:
     def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05):
         self.num_tasks = max_num_levels
@@ -58,20 +60,21 @@ class BidirectionalLearningProgess:
         return task_success_rates
     
     def collect_data(self, infos):
+        if not bool(infos):
+            return
+
         for k, v in infos.items():
             if 'tasks' in k:
                 task_id = int(k.split('/')[1])
                 for res in v:
                     self.outcomes[task_id].append(res)
 
-        self.task_sampled_tracker = [int(bool(o)) for k, o in self.outcomes.items()]
-        print(f'data collected on {sum(self.task_sampled_tracker)} / {self.num_tasks} tasks')
-        if sum(self.task_sampled_tracker) == self.num_tasks:
+        # self.task_sampled_tracker = [int(bool(o)) for k, o in self.outcomes.items()]
+        # print(f'data collected on {sum(self.task_sampled_tracker)} / {self.num_tasks} tasks')
+        # if sum(self.task_sampled_tracker) == self.num_tasks:
             # T()
-            self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
-            self.mean_samples_per_eval.append(np.mean([len(self.outcomes[i]) for i in range(self.num_tasks)]))
-            self.collecting = False
-            self.task_sampled_tracker = self.num_tasks * [0]
+        # self.collecting = False
+        # self.task_sampled_tracker = self.num_tasks * [0]
     
     def continue_collecting(self):
         return self.collecting
@@ -125,9 +128,12 @@ class BidirectionalLearningProgess:
         self.task_dist = task_dist
         self._stale_dist = False
         # clear the outcome dict
-        self.outcomes = defaultdict(list)
+        # go through the outcomes and for each task, keep the last 25
+        self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
+        self.mean_samples_per_eval.append(np.mean([len(self.outcomes[i]) for i in range(self.num_tasks)]))
         for i in range(self.num_tasks):
-            self.outcomes[i] = []
+            if len(self.outcomes[i]) > 25:
+                self.outcomes[i] = self.outcomes[i][-25:]
         self.collecting = True
         return task_dist.astype(np.float32)
     
