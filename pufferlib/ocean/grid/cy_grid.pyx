@@ -127,7 +127,7 @@ cdef class CGrid:
             else:
                 size = max_size
 
-           # size = np.random.randint(5, max_size)
+            # size = np.random.randint(5, max_size)
             if size % 2 == 0:
                 size -= 1
 
@@ -188,7 +188,8 @@ cdef class CGrid:
                 
                 # k% of the time, sample a random map
                 if np.random.rand() < 0.2:
-                    idx = np.random.choice(range(self.num_maps)) 
+                    idx = np.random.choice(range(self.num_maps))
+                    print('sampled randomly: ', idx)
                 
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)

@@ -138,8 +138,7 @@ class BidirectionalLearningProgess:
         self.task_success_rate = np.nan_to_num(out_vec)
         self.mean_samples_per_eval.append(np.mean([len(self.outcomes[i]) for i in range(self.num_tasks)]))
         for i in range(self.num_tasks):
-            if len(self.outcomes[i]) > 25:
-                self.outcomes[i] = self.outcomes[i][-25:]
+            self.outcomes[i] = self.outcomes[i][-25:]
         self.collecting = True
         return task_dist.astype(np.float32)
     
