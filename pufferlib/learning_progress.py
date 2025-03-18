@@ -21,6 +21,7 @@ class BidirectionalLearningProgess:
         self.task_success_rate = None
         self.task_sampled_tracker = max_num_levels * [0]
         self.mean_samples_per_eval = []
+        self.num_nans = []
 
         # should we continue collecting 
         #  or if we have enough data to update the learning progress
@@ -129,7 +130,12 @@ class BidirectionalLearningProgess:
         self._stale_dist = False
         # clear the outcome dict
         # go through the outcomes and for each task, keep the last 25
-        self.task_success_rate = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
+        # plot number of nans in the outcomes
+        # print(f'number of nans in outcomes: {sum(np.isnan([np.mean(self.outcomes[i]) for i in range(self.num_tasks)]))}')
+        out_vec = [np.mean(self.outcomes[i]) for i in range(self.num_tasks)]
+        self.num_nans.append(sum(np.isnan(out_vec)))
+        # sort sample rates and plot to see how big the tail is
+        self.task_success_rate = np.nan_to_num(out_vec)
         self.mean_samples_per_eval.append(np.mean([len(self.outcomes[i]) for i in range(self.num_tasks)]))
         for i in range(self.num_tasks):
             if len(self.outcomes[i]) > 25:
@@ -139,4 +145,4 @@ class BidirectionalLearningProgess:
     
     def calculate_dist(self):
         self.task_success_rate = self._update()
-        return self._sample_distribution()
+        return self._sample_distribution()# 

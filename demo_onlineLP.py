@@ -546,7 +546,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     wandb = None
     if args['neptune']:
         neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
-        neptune["sys/group_tags"].add(['binom_lp'])
+        neptune["sys/group_tags"].add(['online_lp'])
         for k, v in pufferlib.utils.unroll_nested_dict(args):
             neptune[k].append(v)
     elif args['wandb']:
@@ -565,16 +565,6 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     while data.global_step < train_config.total_timesteps:
         clean_pufferl.evaluate(data)
         clean_pufferl.train(data)
-
-        # log_data = dict(
-        #     task_success_rate=np.mean(data.lp.task_success_rate),
-        #     mean_evals_per_task=data.lp.mean_samples_per_eval[-1],
-        #  )
-        # if args['neptune']:
-        #     for k, v in log_data.items():
-        #         neptune[k].append(v)
-        # elif args['wandb']:
-        #     wandb.log(log_data)
 
     steps_evaluated = 0
     cost = data.profile.uptime

@@ -122,7 +122,7 @@ cdef class CGrid:
         cdef float difficulty
         cdef int size
         for i in range(num_maps):
-            if np.random.rand() < 0.2:
+            if np.random.rand() < 0.3:
                 size = np.random.randint(5, max_size)
             else:
                 size = max_size
@@ -155,7 +155,7 @@ cdef class CGrid:
                 if u < cumulative:
                     break
 
-            if np.random.rand() < 0.2:
+            if np.random.rand() < 0.3:
                 idx = np.random.choice(range(self.num_maps))
             
             self.map_idxs[i] = idx

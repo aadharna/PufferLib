@@ -585,12 +585,10 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     lps = []
     # train_config.total_timesteps = 250_000_000
     while data.global_step < train_config.total_timesteps:
-        # data.vecenv.sampling_dist = data.vecenv.uniform_dist
         clean_pufferl.evaluate(data)
-        # data.vecenv.sampling_dist = lp_dist
         clean_pufferl.train(data)
-        # every 5M steps, generate a new sampling vector
-        # let it burn in for 5M steps
+        # every 15M steps, generate a new sampling vector
+        # let it burn in for 15M steps
         loops = 0
         if data.global_step - prev_steps > 15_000_000 and data.global_step > 15_000_000:
             prev_steps = data.global_step

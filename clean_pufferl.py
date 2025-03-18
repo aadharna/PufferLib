@@ -132,8 +132,6 @@ def evaluate(data):
         # 2. update the LP cache and keep the last 25 samples per task
         #    happens below
         data.lp.collect_data(infos)
-        # if data.lp.full:
-        #     data.lp.update()
 
         with profile.env:
             data.vecenv.send(actions)
@@ -167,6 +165,7 @@ def evaluate(data):
     data.vecenv.sampling_dist = lp_dist
     data.stats['task_success_rate'].append(np.nanmean(data.lp.task_success_rate))
     data.stats['mean_evals_per_task'].append(data.lp.mean_samples_per_eval[-1])
+    data.stats['num_nan_tasks'].append(data.lp.num_nans[-1])
     return data.stats, infos
 
 @pufferlib.utils.profile
