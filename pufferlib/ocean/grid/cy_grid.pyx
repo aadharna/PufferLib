@@ -189,7 +189,7 @@ cdef class CGrid:
                 # k% of the time, sample a random map
                 if np.random.rand() < 0.2:
                     idx = np.random.choice(range(self.num_maps))
-                    print('sampled randomly: ', idx)
+                    # print('sampled randomly: ', idx)
                 
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
