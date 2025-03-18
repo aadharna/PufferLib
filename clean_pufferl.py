@@ -124,14 +124,16 @@ def evaluate(data):
             o = o if config.cpu_offload else o_device
             experience.store(o, value, actions, logprob, r, d, env_id, mask)
 
+            new_infos = defaultdict(list)
             for i in info:
                 for k, v in pufferlib.utils.unroll_nested_dict(i):
                     infos[k].append(v)
+                    new_infos[k].append(v)
         
         # 1. add data from info into the LP
         # 2. update the LP cache and keep the last 25 samples per task
         #    happens below
-        data.lp.collect_data(infos)
+        data.lp.collect_data(new_infos)
 
         with profile.env:
             data.vecenv.send(actions)
