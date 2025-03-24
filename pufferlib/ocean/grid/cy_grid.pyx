@@ -141,14 +141,14 @@ cdef class CGrid:
         cdef double u, cumulative
         cdef double s = 0.0
 
-        print("[DEBUG] reset called, num_maps=", self.num_maps, "num_envs=", self.num_envs, flush=True)
+        # print("[DEBUG] reset called, num_maps=", self.num_maps, "num_envs=", self.num_envs, flush=True)
 
         # (Optional) Check or normalize distribution
         for j in range(self.num_maps):
             s += p[j]
         if abs(s - 1.0) > 1e-6:
             raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
-        print("[DEBUG] sum(p) = ", s, flush=True)
+        # print("[DEBUG] sum(p) = ", s, flush=True)
 
         for i in range(self.num_envs):
             u = random()
@@ -167,9 +167,9 @@ cdef class CGrid:
             
             self.map_idxs[i] = idx
             reset(&self.envs[i], i)
-            print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
+            # print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
             set_state(&self.envs[i], &self.levels[idx])
-            print("state is set", flush=True)
+            # print("state is set", flush=True)
 
     def step(self, float[:] p):
         cdef:
@@ -179,9 +179,9 @@ cdef class CGrid:
             double u, cumulative, s
 
         for i in range(self.num_envs):
-            print(f'pre step env {i}')
+            # print(f'pre step env {i}')
             done = step(&self.envs[i])
-            print(f'stepped through env {i}')
+            # print(f'stepped through env {i}')
             if done:
                 s = 0.0
                 # (Optional) Check or normalize distribution
@@ -199,7 +199,7 @@ cdef class CGrid:
 
                 # if idx == self.num_maps:
                 #     idx -= 1  # fallback if cumsum < 1.0 due to float rounding
-                print(f"[DEBUG] env {i}: u={u}, chosen idx={idx}", flush=True)
+                # print(f"[DEBUG] env {i}: u={u}, chosen idx={idx}", flush=True)
                 
                 # k% of the time, sample a random map
                 if np.random.rand() < 0.3:
@@ -208,9 +208,9 @@ cdef class CGrid:
                 
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
-                print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
+                # print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
                 set_state(&self.envs[i], &self.levels[idx])
-                print("state is set", flush=True)
+                # print("state is set", flush=True)
 
     def render(self, int cell_size=16):
         if self.client == NULL:
