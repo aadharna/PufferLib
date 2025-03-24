@@ -576,6 +576,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         loops += 1
         while not all(eval_data.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and eval_data.lp.collecting:
             eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+            eval_data.lp.task_sampled_tracker = [int(bool(o)) for k, o in eval_data.lp.outcomes.items()]
             print(f'data collected on {sum(eval_data.lp.task_sampled_tracker)} / {eval_data.lp.num_tasks} tasks')
             if sum(eval_data.lp.task_sampled_tracker) == eval_data.lp.num_tasks:
                 eval_data.lp.collecting = False
