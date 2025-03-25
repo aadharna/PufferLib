@@ -164,8 +164,8 @@ def evaluate(data):
     data.experience.ptr = 0
     data.experience.step = 0
     if data.epoch > 10:
-        lp_dist, subsample_dist, levels = data.lp.calculate_dist()
-        data.vecenv.sampling_dist = subsample_dist
+        lp_dist, levels = data.lp.calculate_dist()
+        data.vecenv.sampling_dist = lp_dist
         data.vecenv.levels = levels
         data.stats['mean_sample_prob'].append(np.mean(lp_dist))
         data.stats['num_zeros_lp_dist'].append(np.sum(lp_dist == 0))

@@ -36,14 +36,14 @@ class PufferGrid(pufferlib.PufferEnv):
 
     def reset(self, seed=None):
         self.tick = 0
-        self.c_envs.reset(self.sampling_dist)
+        self.c_envs.reset(self.levels)
         return self.observations, []
 
     def step(self, actions):
         self.float_actions[:] = actions
         # if self.sampling_dist.sum() > 1:
         #     T()
-        self.c_envs.step(self.sampling_dist)
+        self.c_envs.step(self.levels)
         
         info = []
         if self.tick % self.report_interval == 0:

@@ -151,7 +151,6 @@ class BidirectionalLearningProgess:
         self.collecting = True
         sample_levels = []
         self.update_mask = np.zeros(self.num_tasks).astype(bool)
-        sample_dist = np.zeros(self.num_tasks)
         for i in range(32):
             if np.random.rand() < 0.2:
                 level = np.random.choice(range(self.num_tasks))
@@ -159,9 +158,8 @@ class BidirectionalLearningProgess:
                 level = np.random.choice(range(self.num_tasks), p=task_dist)
             sample_levels.append(level)
             self.update_mask[level] = True
-            sample_dist[level] += 1/32
         sample_levels = np.array(sample_levels)
-        return task_dist.astype(np.float32), sample_dist.astype(np.float32), sample_levels.astype(np.int32)
+        return task_dist.astype(np.float32), sample_levels.astype(np.int32)
     
     def calculate_dist(self):
         self.task_success_rate = self._update()

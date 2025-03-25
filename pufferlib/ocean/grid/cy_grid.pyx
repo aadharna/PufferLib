@@ -77,7 +77,7 @@ cdef extern from "grid.h":
 
 import numpy as np
 cimport numpy as cnp
-from random import random
+from random import random, choice
 
 cdef class CGrid:
     cdef:
@@ -143,7 +143,7 @@ cdef class CGrid:
             init_state(&self.levels[i], max_size, 1)
             get_state(&self.envs[0], &self.levels[i])
 
-    def reset(self, float[:] p):
+    def reset(self, int[:] levels):
         cdef int i, j, idx
         cdef double u, cumulative
         cdef double s = 0.0
@@ -151,19 +151,19 @@ cdef class CGrid:
         # print("[DEBUG] reset called, num_maps=", self.num_maps, "num_envs=", self.num_envs, flush=True)
 
         # (Optional) Check or normalize distribution
-        for j in range(self.num_maps):
-            s += p[j]
-        if abs(s - 1.0) > 1e-6:
-            raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
+        # for j in range(self.num_maps):
+        #     s += p[j]
+        # if abs(s - 1.0) > 1e-6:
+        #     raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
         # print("[DEBUG] sum(p) = ", s, flush=True)
 
         for i in range(self.num_envs):
-            u = random()
-            cumulative = 0.0
-            for idx in range(self.num_maps):
-                cumulative += p[idx]
-                if u < cumulative:
-                    break
+            # u = random()
+            # cumulative = 0.0
+            # for idx in range(self.num_maps):
+            #     cumulative += p[idx]
+            #     if u < cumulative:
+            #         break
 
             # if idx == self.num_maps:
             #     idx -= 1  # fallback if cumsum < 1.0 due to float rounding
@@ -172,13 +172,15 @@ cdef class CGrid:
             # if np.random.rand() < 0.3:
             #     idx = np.random.choice(range(self.num_maps))
             
+            idx = choice(levels)
+            
             self.map_idxs[i] = idx
             reset(&self.envs[i], i)
             # print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
             set_state(&self.envs[i], &self.levels[idx])
             # print("state is set", flush=True)
 
-    def step(self, float[:] p):
+    def step(self, int[:] levels):
         cdef:
             int i, idx
             bint done
@@ -192,17 +194,17 @@ cdef class CGrid:
             if done:
                 s = 0.0
                 # (Optional) Check or normalize distribution
-                for j in range(self.num_maps):
-                    s += p[j]
-                if abs(s - 1.0) > 1e-6:
-                    raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
+                # for j in range(self.num_maps):
+                #     s += p[j]
+                # if abs(s - 1.0) > 1e-6:
+                #     raise ValueError("Distribution p does not sum to 1.0 (sum = %f)" % s)
 
-                u = random()
-                cumulative = 0.0
-                for idx in range(self.num_maps):
-                    cumulative += p[idx]
-                    if u < cumulative:
-                        break
+                # u = random()
+                # cumulative = 0.0
+                # for idx in range(self.num_maps):
+                #     cumulative += p[idx]
+                #     if u < cumulative:
+                #         break
 
                 # if idx == self.num_maps:
                 #     idx -= 1  # fallback if cumsum < 1.0 due to float rounding
@@ -212,6 +214,8 @@ cdef class CGrid:
                 # if np.random.rand() < 0.3:
                 #     idx = np.random.choice(range(self.num_maps))
                 #     # print('sampled randomly: ', idx)
+                
+                idx = choice(levels)
                 
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
