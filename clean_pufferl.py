@@ -163,9 +163,14 @@ def evaluate(data):
     # TODO: Better way to enable multiple collects
     data.experience.ptr = 0
     data.experience.step = 0
-    if data.epoch > 50:
+    if data.epoch > 100:
         lp_dist = data.lp.calculate_dist()
         data.vecenv.sampling_dist = lp_dist
+        data.stats['mean_sample_prob'] = [np.mean(lp_dist)]
+        data.stats['num_zeros_lp_dist'] = [np.sum(lp_dist == 0)]
+        data.stats['task_1_success_rate'] = [data.lp.task_success_rate[0]]
+        data.stats['task_500_success_rate'] = [data.lp.task_success_rate[499]]
+        data.stats['last_task_success_rate'] = [data.lp.task_success_rate[-1]]
         data.stats['task_success_rate'].append(np.mean(data.lp.task_success_rate))
         data.stats['mean_evals_per_task'].append(data.lp.mean_samples_per_eval[-1])
         data.stats['num_nan_tasks'].append(data.lp.num_nans[-1])
