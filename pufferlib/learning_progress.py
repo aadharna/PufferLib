@@ -29,6 +29,8 @@ class BidirectionalLearningProgess:
         #  or if we have enough data to update the learning progress
         self.collecting = True
         self.update_mask = np.ones(max_num_levels).astype(bool)
+        self.sample_levels = np.arange(max_num_levels).astype(np.int32)
+        self.counter = {i: 0 for i in self.sample_levels}
 
     def _update(self):
         task_success_rates = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
@@ -77,7 +79,11 @@ class BidirectionalLearningProgess:
             if 'tasks' in k:
                 task_id = int(k.split('/')[1])
                 for res in v:
+                    # we could be finishing up a rollout from last time
+                    # don't count that one below
                     self.outcomes[task_id].append(res)
+                    if task_id in self.sample_levels:
+                        self.counter[task_id] += 1
 
         # self.task_sampled_tracker = [int(bool(o)) for k, o in self.outcomes.items()]
         # print(f'data collected on {sum(self.task_sampled_tracker)} / {self.num_tasks} tasks')
@@ -112,10 +118,6 @@ class BidirectionalLearningProgess:
 
     def _sample_distribution(self):
         """ Return sampling distribution over the task space based on the learning progress."""
-        if not self._stale_dist:
-            # No changes since distribution was last computed
-            return self.task_dist
-
         task_dist = np.ones(self.num_tasks) / self.num_tasks
 
         learning_progress = self._learning_progress()
@@ -135,7 +137,7 @@ class BidirectionalLearningProgess:
             # If all tasks have 0 progress, return uniform distribution
             task_dist = subprobs
 
-        self.task_dist = task_dist
+        self.task_dist = task_dist.astype(np.float32)
         self._stale_dist = False
         # clear the outcome dict
         # go through the outcomes and for each task, keep the last 25
@@ -158,9 +160,13 @@ class BidirectionalLearningProgess:
                 level = np.random.choice(range(self.num_tasks), p=task_dist)
             sample_levels.append(level)
             self.update_mask[level] = True
-        sample_levels = np.array(sample_levels)
-        return task_dist.astype(np.float32), sample_levels.astype(np.int32)
+        self.sample_levels = np.array(sample_levels).astype(np.int32)
+        self.counter = {i: 0 for i in self.sample_levels}
+        return self.task_dist, self.sample_levels
     
     def calculate_dist(self):
+        if all([v < 32 for k, v in self.counter.items()]) and self.random_baseline is not None:
+            # collect more data on the current batch of tasks
+            return self.task_dist, self.sample_levels
         self.task_success_rate = self._update()
         return self._sample_distribution()# 
