@@ -169,8 +169,8 @@ cdef class CGrid:
             #     idx -= 1  # fallback if cumsum < 1.0 due to float rounding
             # print(f"[DEBUG] env {i}: u={u}, chosen idx={idx}", flush=True)
             
-            if np.random.rand() < 0.3:
-                idx = np.random.choice(range(self.num_maps))
+            # if np.random.rand() < 0.3:
+            #     idx = np.random.choice(range(self.num_maps))
             
             self.map_idxs[i] = idx
             reset(&self.envs[i], i)
@@ -209,9 +209,9 @@ cdef class CGrid:
                 # print(f"[DEBUG] env {i}: u={u}, chosen idx={idx}", flush=True)
                 
                 # k% of the time, sample a random map
-                if np.random.rand() < 0.3:
-                    idx = np.random.choice(range(self.num_maps))
-                    # print('sampled randomly: ', idx)
+                # if np.random.rand() < 0.3:
+                #     idx = np.random.choice(range(self.num_maps))
+                #     # print('sampled randomly: ', idx)
                 
                 self.map_idxs[i] = idx
                 reset(&self.envs[i], i)

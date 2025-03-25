@@ -564,33 +564,35 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     lps = []
     # let's just get data from all of the envs to start off and then switch to online.
     # this is also our necessary random baseline
-    while data.lp.continue_collecting():
-        _sampling_dist = eval_data.vecenv.sampling_dist
-        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-        sampling_dist[loops*window:(loops+1)*window] = 1 / window
-        # make sure the sampling distribution sums to 1
-        if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-            sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-            sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
-        eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
-        loops += 1
-        while not all(eval_data.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and eval_data.lp.collecting:
-            eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
-            eval_data.lp.task_sampled_tracker = [int(bool(o)) for k, o in eval_data.lp.outcomes.items()]
-            print(f'data collected on {sum(eval_data.lp.task_sampled_tracker)} / {eval_data.lp.num_tasks} tasks')
-            if sum(eval_data.lp.task_sampled_tracker) == eval_data.lp.num_tasks:
-                eval_data.lp.collecting = False
-            # data.lp.collect_data(eval_infos)
+    # while data.lp.continue_collecting():
+    #     _sampling_dist = eval_data.vecenv.sampling_dist
+    #     sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+    #     sampling_dist[loops*window:(loops+1)*window] = 1 / window
+    #     # make sure the sampling distribution sums to 1
+    #     if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
+    #         sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+    #         sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
+    #     eval_data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
+    #     eval_data.vecenv.levels = np.arange(loops*window, min((loops+1)*window, args['env']['num_maps'])).astype(np.int32)
+    #     loops += 1
+    #     while not all(eval_data.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and eval_data.lp.collecting:
+    #         eval_stats, eval_infos = clean_pufferl.evaluate(eval_data)
+    #         eval_data.lp.task_sampled_tracker = [int(bool(o)) for k, o in eval_data.lp.outcomes.items()]
+    #         print(f'data collected on {sum(eval_data.lp.task_sampled_tracker)} / {eval_data.lp.num_tasks} tasks')
+    #         if sum(eval_data.lp.task_sampled_tracker) == eval_data.lp.num_tasks:
+    #             eval_data.lp.collecting = False
+    #         # data.lp.collect_data(eval_infos)
 
-        eval_data.stats.clear()
-        eval_data.experience.sort_keys = []
+    #     eval_data.stats.clear()
+    #     eval_data.experience.sort_keys = []
 
-    init_samples = np.mean([len(eval_data.lp.outcomes[i]) for i in range(eval_data.lp.num_tasks)])
-    task_success = np.mean([np.mean(eval_data.lp.outcomes[i]) for i in range(eval_data.lp.num_tasks)])
+    # init_samples = np.mean([len(eval_data.lp.outcomes[i]) for i in range(eval_data.lp.num_tasks)])
+    # task_success = np.mean([np.mean(eval_data.lp.outcomes[i]) for i in range(eval_data.lp.num_tasks)])
 
     # T()
-    lp_dist = data.lp.calculate_dist()
-    data.vecenv.sampling_dist = np.copy(data.vecenv.uniform_dist).astype(np.float32)
+    # lp_dist, levels = data.lp.calculate_dist()
+    # data.vecenv.sampling_dist = np.copy(data.vecenv.uniform_dist).astype(np.float32)
+    # data.vecenv.levels = levels
     # T()
 
     # train_config.total_timesteps = 250_000_000

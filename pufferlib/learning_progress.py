@@ -28,9 +28,11 @@ class BidirectionalLearningProgess:
         # should we continue collecting 
         #  or if we have enough data to update the learning progress
         self.collecting = True
+        self.update_mask = np.ones(max_num_levels).astype(bool)
 
     def _update(self):
         task_success_rates = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
+        update_mask = self.update_mask
 
         if self.random_baseline is None:
             # Assume that any perfect success rate is actually 75% due to evaluation precision.
@@ -40,23 +42,28 @@ class BidirectionalLearningProgess:
             #  warnings.warn(
             #     f"Tasks {high_success_idxs} had very high success rates {high_success_rates} for random baseline. Consider removing them from the training set of tasks.")
             self.random_baseline = np.minimum(task_success_rates, 0.75)
+            self.task_rates = task_success_rates
 
         # Update task scores
         normalized_task_success_rates = np.maximum(
-            task_success_rates - self.random_baseline, np.zeros(task_success_rates.shape)) / (1.0 - self.random_baseline)
+            task_success_rates[update_mask] - self.random_baseline[update_mask], 
+            np.zeros(task_success_rates[update_mask].shape)) / (1.0 - self.random_baseline[update_mask])
 
         if self._p_fast is None:
             # Initial values
-            self._p_fast = normalized_task_success_rates
-            self._p_slow = normalized_task_success_rates
-            self._p_true = task_success_rates
+            self._p_fast = normalized_task_success_rates[update_mask]
+            self._p_slow = normalized_task_success_rates[update_mask]
+            self._p_true = task_success_rates[update_mask]
         else:
             # Exponential moving average
-            self._p_fast = (normalized_task_success_rates * self.ema_alpha) + (self._p_fast * (1.0 - self.ema_alpha))
-            self._p_slow = (self._p_fast * self.ema_alpha) + (self._p_slow * (1.0 - self.ema_alpha))
-            self._p_true = (task_success_rates * self.ema_alpha) + (self._p_true * (1.0 - self.ema_alpha))
+            try:
+                self._p_fast[update_mask] = (normalized_task_success_rates * self.ema_alpha) + (self._p_fast[update_mask] * (1.0 - self.ema_alpha))
+                self._p_slow[update_mask] = (self._p_fast[update_mask] * self.ema_alpha) + (self._p_slow[update_mask] * (1.0 - self.ema_alpha))
+                self._p_true[update_mask] = (task_success_rates[update_mask] * self.ema_alpha) + (self._p_true[update_mask] * (1.0 - self.ema_alpha))
+            except IndexError:
+                T()
 
-        self.task_rates = task_success_rates    # Logging only
+        self.task_rates[update_mask] = task_success_rates[update_mask]    # Logging only
         self._stale_dist = True
         self.task_dist = None
 
@@ -142,7 +149,19 @@ class BidirectionalLearningProgess:
         for i in range(self.num_tasks):
             self.outcomes[i] = self.outcomes[i][-25:]
         self.collecting = True
-        return task_dist.astype(np.float32)
+        sample_levels = []
+        self.update_mask = np.zeros(self.num_tasks).astype(bool)
+        sample_dist = np.zeros(self.num_tasks)
+        for i in range(32):
+            if np.random.rand() < 0.2:
+                level = np.random.choice(range(self.num_tasks))
+            else:
+                level = np.random.choice(range(self.num_tasks), p=task_dist)
+            sample_levels.append(level)
+            self.update_mask[level] = True
+            sample_dist[level] += 1/32
+        sample_levels = np.array(sample_levels)
+        return task_dist.astype(np.float32), sample_dist.astype(np.float32), sample_levels.astype(np.int32)
     
     def calculate_dist(self):
         self.task_success_rate = self._update()
