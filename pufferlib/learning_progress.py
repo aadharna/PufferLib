@@ -7,6 +7,8 @@ import pufferlib
 
 class BidirectionalLearningProgess:
     def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05):
+        # try reducing ema_alpha more? do tuning sweep over that
+        # also do the sweep on p_theta
         self.num_tasks = max_num_levels
         self.ema_alpha = ema_alpha
         self.p_theta = p_theta

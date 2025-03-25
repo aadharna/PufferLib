@@ -131,6 +131,13 @@ cdef class CGrid:
             if size % 2 == 0:
                 size -= 1
 
+            if i == 0:
+                size = 5
+            elif i == 499:
+                size = max_size // 2
+            elif i == num_maps - 1:
+                size = max_size
+
             difficulty = difficulties[i]
             create_maze_level(&self.envs[0], size, size, difficulty, i)
             init_state(&self.levels[i], max_size, 1)
