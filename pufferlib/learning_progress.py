@@ -153,7 +153,8 @@ class BidirectionalLearningProgess:
         self.collecting = True
         sample_levels = []
         self.update_mask = np.zeros(self.num_tasks).astype(bool)
-        for i in range(32):
+        n = 16
+        for i in range(n):
             if np.random.rand() < 0.2:
                 level = np.random.choice(range(self.num_tasks))
             else:
@@ -165,8 +166,8 @@ class BidirectionalLearningProgess:
         return self.task_dist, self.sample_levels
     
     def calculate_dist(self):
-        if all([v < 32 for k, v in self.counter.items()]) and self.random_baseline is not None:
+        if all([v < 15 for k, v in self.counter.items()]) and self.random_baseline is not None:
             # collect more data on the current batch of tasks
             return self.task_dist, self.sample_levels
         self.task_success_rate = self._update()
-        return self._sample_distribution()# 
+        return self._sample_distribution()
