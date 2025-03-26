@@ -127,16 +127,16 @@ cdef class CGrid:
             else:
                 size = max_size
 
-            # size = np.random.randint(5, max_size)
-            if size % 2 == 0:
-                size -= 1
-
             if i == 0:
                 size = 5
             elif i == 499:
                 size = max_size // 2
             elif i == num_maps - 1:
                 size = max_size
+
+            # size = np.random.randint(5, max_size)
+            if size % 2 == 0:
+                size -= 1
 
             difficulty = difficulties[i]
             create_maze_level(&self.envs[0], size, size, difficulty, i)
