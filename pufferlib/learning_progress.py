@@ -6,7 +6,8 @@ from collections import defaultdict
 import pufferlib
 
 class BidirectionalLearningProgess:
-    def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, sample_threshold = 15):
+    def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, 
+                 sample_threshold = 15, memory = 25):
         # try reducing ema_alpha more? do tuning sweep over that
         # also do the sweep on p_theta
         self.num_tasks = max_num_levels
@@ -15,6 +16,7 @@ class BidirectionalLearningProgess:
         self.n = num_active_tasks
         self.rand_task_rate = rand_task_rate
         self.sample_threshold = sample_threshold
+        self.memory = memory
         self.outcomes = {}
         for i in range(max_num_levels):
             self.outcomes[i] = []
@@ -152,7 +154,7 @@ class BidirectionalLearningProgess:
         self.task_success_rate = np.nan_to_num(out_vec)
         self.mean_samples_per_eval.append(np.mean([len(self.outcomes[i]) for i in range(self.num_tasks)]))
         for i in range(self.num_tasks):
-            self.outcomes[i] = self.outcomes[i][-25:]
+            self.outcomes[i] = self.outcomes[i][-self.memory:]
         self.collecting = True
         sample_levels = []
         self.update_mask = np.zeros(self.num_tasks).astype(bool)
