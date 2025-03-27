@@ -6,12 +6,15 @@ from collections import defaultdict
 import pufferlib
 
 class BidirectionalLearningProgess:
-    def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05):
+    def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, sample_threshold = 15):
         # try reducing ema_alpha more? do tuning sweep over that
         # also do the sweep on p_theta
         self.num_tasks = max_num_levels
         self.ema_alpha = ema_alpha
         self.p_theta = p_theta
+        self.n = num_active_tasks
+        self.rand_task_rate = rand_task_rate
+        self.sample_threshold = sample_threshold
         self.outcomes = {}
         for i in range(max_num_levels):
             self.outcomes[i] = []
@@ -153,9 +156,8 @@ class BidirectionalLearningProgess:
         self.collecting = True
         sample_levels = []
         self.update_mask = np.zeros(self.num_tasks).astype(bool)
-        n = 16
-        for i in range(n):
-            if np.random.rand() < 0.2:
+        for i in range(self.n):
+            if np.random.rand() < self.rand_task_rate:
                 level = np.random.choice(range(self.num_tasks))
             else:
                 level = np.random.choice(range(self.num_tasks), p=task_dist)
@@ -166,7 +168,7 @@ class BidirectionalLearningProgess:
         return self.task_dist, self.sample_levels
     
     def calculate_dist(self):
-        if all([v < 15 for k, v in self.counter.items()]) and self.random_baseline is not None:
+        if all([v < self.sample_threshold for k, v in self.counter.items()]) and self.random_baseline is not None:
             # collect more data on the current batch of tasks
             return self.task_dist, self.sample_levels
         self.task_success_rate = self._update()
