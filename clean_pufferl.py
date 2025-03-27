@@ -34,11 +34,11 @@ from torch.utils.cpp_extension import load
 
 
 # Compile the CUDA kernel
-cuda_module = load(
-    name='advantage_kernel',
-    sources=['pufferlib.cu'],
-    verbose=True
-)
+# cuda_module = load(
+#     name='advantage_kernel',
+#     sources=['pufferlib.cu'],
+#     verbose=True
+# )
 
 def compute_advantages(
     reward_block: torch.Tensor,  # [num_steps, horizon]
@@ -148,6 +148,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
             beta=config.adam_beta1,
         )
 
+    # breakpoint()
     lp = BidirectionalLearningProgess(max_num_levels=config.num_maps,
                                       ema_alpha=config.ema_alpha,
                                       p_theta=config.p_theta,

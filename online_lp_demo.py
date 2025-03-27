@@ -164,8 +164,12 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     elif args['wandb']:
         wandb = init_wandb(args, env_name, id=args['exp_id'], tag=args['tag'])
 
+    
+    # print(args['train']['num_envs'])
+    # print(args['env']['num_envs'])
+    # breakpoint()
     train_config = pufferlib.namespace(**args['train'], env=env_name,
-        exp_id=args['exp_id'] or env_name + '-' + str(uuid.uuid4())[:8])
+        exp_id=args['exp_id'] or env_name + '-' + str(uuid.uuid4())[:8], **args['env'])
     data = clean_pufferl.create(train_config, vecenv, policy, wandb=wandb, neptune=neptune)
 
     timesteps = []
@@ -265,7 +269,7 @@ def train_ddp(rank, world_size, args, make_env, policy_cls, rnn_cls, target_metr
     dist.destroy_process_group()
 
 if __name__ == '__main__':
-    breakpoint()
+    # breakpoint()
     parser = argparse.ArgumentParser(
         description=f':blowfish: PufferLib [bright_cyan]{pufferlib.__version__}[/]'
         ' demo options. Shows valid args for your env and policy',

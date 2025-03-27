@@ -10,25 +10,26 @@ from pufferlib.ocean.grid.cy_grid import CGrid
 
 class Grid(pufferlib.PufferEnv):
     def __init__(self, render_mode='raylib', vision_range=5,
-            num_envs=4096, num_maps=1000, map_size=-1, max_map_size=9,
+            num_sims=4096, num_maps=1000, map_size=-1, max_map_size=9,
             report_interval=128, buf=None):
+        # breakpoint()
         self.obs_size = 2*vision_range + 1
         self.single_observation_space = gymnasium.spaces.Box(low=0, high=255,
             shape=(self.obs_size*self.obs_size,), dtype=np.uint8)
         self.single_action_space = gymnasium.spaces.Discrete(5)
         self.render_mode = render_mode
-        self.num_agents = num_envs
+        self.num_agents = num_sims
         self.report_interval = report_interval
         super().__init__(buf=buf)
         self.float_actions = np.zeros_like(self.actions).astype(np.float32)
         # parameters for learning progress
         self.map_seeds = np.linspace(0, 1, num_maps).astype(np.float32)
-        self.active_ids = np.zeros(num_envs).astype(np.float32)
+        self.active_ids = np.zeros(num_sims).astype(np.float32)
         self.uniform_dist = np.ones(num_maps).astype(np.float32) / num_maps
         self.sampling_dist = np.copy(self.uniform_dist)
         self.levels = np.arange(32).astype(np.int32)
         self.c_envs = CGrid(self.observations, self.float_actions, self.map_seeds, self.active_ids,
-            self.rewards, self.terminals, num_envs, num_maps, max_map_size)
+            self.rewards, self.terminals, num_sims, num_maps, map_size, max_map_size)
         # breakpoint()
         pass
 
