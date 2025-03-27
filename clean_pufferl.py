@@ -19,6 +19,7 @@ import torch.distributed as dist
 import pufferlib
 import pufferlib.utils
 import pufferlib.pytorch
+from pufferlib.learning_progress import BidirectionalLearningProgess
 
 from mup import MuAdam
 
@@ -147,6 +148,14 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
             beta=config.adam_beta1,
         )
 
+    lp = BidirectionalLearningProgess(max_num_levels=config.num_maps,
+                                      ema_alpha=config.ema_alpha,
+                                      p_theta=config.p_theta,
+                                      num_active_tasks=config.num_active_tasks,
+                                      rand_task_rate=config.rand_task_rate,
+                                      sample_threshold=config.sample_threshold,
+                                      memory=config.memory)
+
     epochs = config.total_timesteps // config.batch_size
     assert config.scheduler in ('linear', 'cosine')
     if config.scheduler == 'linear':
@@ -190,6 +199,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
         use_diayn=config.use_diayn,
         diayn_archive=config.diayn_archive,
         diayn_coef=config.diayn_coef,
+        lp=lp,
     )
 
 @pufferlib.utils.profile
@@ -315,10 +325,14 @@ def evaluate(data):
                 if config.device == 'cuda':
                     torch.cuda.synchronize()
 
+            new_infos = defaultdict(list)
             with profile.eval_misc:
                 for i in info:
                     for k, v in pufferlib.utils.unroll_nested_dict(i):
                         infos[k].append(v)
+                        new_infos[k].append(v)
+
+            data.lp.collect_data(new_infos)
 
             with profile.env:
                 data.vecenv.send(actions)
@@ -333,6 +347,9 @@ def evaluate(data):
                     # TODO: Add neptune image logging
                     pass
 
+            if 'tasks' in k:
+                continue
+            
             if isinstance(v, np.ndarray):
                 v = v.tolist()
             try:
@@ -345,6 +362,18 @@ def evaluate(data):
     # TODO: Better way to enable multiple collects
     data.experience.ptr = 0
     data.experience.step = 0
+    if data.epoch > 50:
+        lp_dist, levels = data.lp.calculate_dist()
+        data.vecenv.sampling_dist = lp_dist
+        data.vecenv.levels = levels
+        data.stats['mean_sample_prob'].append(np.mean(lp_dist))
+        data.stats['num_zeros_lp_dist'].append(np.sum(lp_dist == 0))
+        data.stats['task_1_success_rate'].append(data.lp.task_success_rate[0])
+        data.stats['task_500_success_rate'].append(data.lp.task_success_rate[499])
+        data.stats['last_task_success_rate'].append(data.lp.task_success_rate[-1])
+        data.stats['task_success_rate'].append(np.mean(data.lp.task_success_rate))
+        data.stats['mean_evals_per_task'].append(data.lp.mean_samples_per_eval[-1])
+        data.stats['num_nan_tasks'].append(data.lp.num_nans[-1])
     return data.stats, infos
 
 @pufferlib.utils.profile

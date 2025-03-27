@@ -85,10 +85,9 @@ int main() {
             reset(env, seed);
             create_maze_level(env, 5, 5, 0.85, seed);
         }
-        render_global(renderer, env, (float)tick/12.0);
+        render_global(renderer, env, (float)tick/12.0, 0.);
     }
     close_renderer(renderer);
     free_allocated_grid(env);
     return 0;
 }
-

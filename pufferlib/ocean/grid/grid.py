@@ -1,3 +1,5 @@
+from pdb import set_trace as T
+
 import numpy as np
 import os
 
@@ -19,23 +21,43 @@ class Grid(pufferlib.PufferEnv):
         self.report_interval = report_interval
         super().__init__(buf=buf)
         self.float_actions = np.zeros_like(self.actions).astype(np.float32)
-        self.c_envs = CGrid(self.observations, self.float_actions,
-            self.rewards, self.terminals, num_envs, num_maps, map_size, max_map_size)
+        # parameters for learning progress
+        self.map_seeds = np.linspace(0, 1, num_maps).astype(np.float32)
+        self.active_ids = np.zeros(num_envs).astype(np.float32)
+        self.uniform_dist = np.ones(num_maps).astype(np.float32) / num_maps
+        self.sampling_dist = np.copy(self.uniform_dist)
+        self.levels = np.arange(32).astype(np.int32)
+        self.c_envs = CGrid(self.observations, self.float_actions, self.map_seeds, self.active_ids,
+            self.rewards, self.terminals, num_envs, num_maps, max_map_size)
+        # breakpoint()
+        pass
 
     def reset(self, seed=None):
         self.tick = 0
-        self.c_envs.reset()
+        self.c_envs.reset(self.levels)
         return self.observations, []
 
     def step(self, actions):
         self.float_actions[:] = actions
-        self.c_envs.step()
+        self.c_envs.step(self.levels)
 
         info = []
         if self.tick % self.report_interval == 0:
             log = self.c_envs.log()
             if log['episode_length'] > 0:
                info.append(log)
+
+        # if self.eval:
+        # catch outcomes
+        rollout_done = any(self.terminals)
+        reward_of_done = self.rewards[self.terminals]
+        done_ids = self.active_ids[self.terminals].astype(int)
+        if rollout_done:
+            task_result = {done_ids[i]: reward_of_done[i] for i in range(len(reward_of_done))}
+            if info:
+                info[0]['tasks'] = task_result
+            else:
+                info.append({'tasks': task_result})
 
         self.tick += 1
         return (self.observations, self.rewards,

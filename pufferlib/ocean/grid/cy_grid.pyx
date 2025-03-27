@@ -80,6 +80,7 @@ cdef extern from "grid.h":
 
 import numpy as np
 cimport numpy as cnp
+from random import random, choice
 
 cdef class CGrid:
     cdef:
@@ -90,8 +91,9 @@ cdef class CGrid:
         int num_envs
         int num_maps
         int max_size
+        float* map_idxs
 
-    def __init__(self, unsigned char[:, :] observations, float[:] actions,
+    def __init__(self, unsigned char[:, :] observations, float[:] actions, float[:] difficulties, float[:] active_ids,
             float[:] rewards, unsigned char[:] terminals, int num_envs, int num_maps,
             int size, int max_size):
 
@@ -106,6 +108,8 @@ cdef class CGrid:
         self.levels = <State*> calloc(num_maps, sizeof(State))
         self.envs = <Grid*> calloc(num_envs, sizeof(Grid))
         self.logs = allocate_logbuffer(LOG_BUFFER_SIZE)
+        self.map_idxs = &active_ids[0]
+
 
         cdef int i
         for i in range(num_envs):
@@ -126,39 +130,52 @@ cdef class CGrid:
         cdef float difficulty
         cdef int sz
         for i in range(num_maps):
-
-            # RNG or fixed size
-            if size == -1:
+            if np.random.rand() < 0.2:
                 sz = np.random.randint(5, max_size)
             else:
-                sz = size
+                sz = max_size
 
+            if i == 0:
+                sz = 5
+            elif i == 499:
+                sz = max_size // 2
+            elif i == num_maps - 1:
+                sz = max_size
+
+            # size = np.random.randint(5, max_size)
             if sz % 2 == 0:
                 sz -= 1
 
-            difficulty = np.random.rand()
+            difficulty = difficulties[i]
             create_maze_level(&self.envs[0], sz, sz, difficulty, i)
             init_state(&self.levels[i], max_size, 1)
             get_state(&self.envs[0], &self.levels[i])
 
-    def reset(self):
+    def reset(self, int[:] levels):
         cdef int i, idx
         for i in range(self.num_envs):
-            idx = rand() % self.num_maps
+            idx = choice(levels)
+            
+            self.map_idxs[i] = idx
             reset(&self.envs[i], i)
+            # print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
             set_state(&self.envs[i], &self.levels[idx])
-            compute_observations(&self.envs[i])
 
-    def step(self):
+    def step(self, int[:] levels):
         cdef:
             int i, idx
             bint done
+            int j
+            double u, cumulative, s
         
         for i in range(self.num_envs):
             done = step(&self.envs[i])
             if done:
-                idx = rand() % self.num_maps
+                idx = choice(levels)
+                
+                self.map_idxs[i] = idx
                 reset(&self.envs[i], i)
+                # print(f"[DEBUG] env {i}: set_state({idx})", flush=True)
                 set_state(&self.envs[i], &self.levels[idx])
 
                 if i == 0 and self.client != NULL:
