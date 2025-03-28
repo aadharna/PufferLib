@@ -175,3 +175,9 @@ class BidirectionalLearningProgess:
             return self.task_dist, self.sample_levels
         self.task_success_rate = self._update()
         return self._sample_distribution()
+    
+    def reset_outcomes(self):
+        self.prev_outcomes = self.outcomes
+        self.outcomes = {}
+        for i in range(self.num_tasks):
+            self.outcomes[i] = []

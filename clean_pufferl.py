@@ -367,7 +367,7 @@ def evaluate(data):
         lp_dist, levels = data.lp.calculate_dist()
         data.vecenv.sampling_dist = lp_dist
         data.vecenv.levels = levels
-        data.stats['mean_sample_prob'].append(np.mean(lp_dist))
+        data.stats['mean_sample_prob'].append(np.mean(lp_dist)) 
         data.stats['num_zeros_lp_dist'].append(np.sum(lp_dist == 0))
         data.stats['task_1_success_rate'].append(data.lp.task_success_rate[0])
         data.stats['task_500_success_rate'].append(data.lp.task_success_rate[499])

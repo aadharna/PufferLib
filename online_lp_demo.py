@@ -224,7 +224,39 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
 
     clean_pufferl.mean_and_log(data)
     score = stats[target_metric]
-    print(f'Evaluated {steps_evaluated} steps. Score: {score}')
+    
+    prev_steps = 0
+    window = args['env']['num_maps'] // 200
+    loops = 0
+    lps = []
+    # reset the outcomes dict to get proper sampling for final eval
+    data.lp.reset_outcomes()
+    while data.lp.continue_collecting():
+        _sampling_dist = data.vecenv.sampling_dist
+        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+        sampling_dist[loops*window:(loops+1)*window] = 1 / window
+        # make sure the sampling distribution sums to 1
+        if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
+            sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+            sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
+        data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
+        data.vecenv.levels = np.arange(loops*window, min((loops+1)*window, args['env']['num_maps'])).astype(np.int32)
+        loops += 1
+        while not all(data.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.lp.collecting:
+            eval_stats, eval_infos = clean_pufferl.evaluate(data)
+            data.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.lp.outcomes.items()]
+            # print(f'data collected on {sum(data.lp.task_sampled_tracker)} / {data.lp.num_tasks} tasks')
+            if sum(data.lp.task_sampled_tracker) == data.lp.num_tasks:
+                data.lp.collecting = False
+            # data.lp.collect_data(eval_infos)
+
+        data.stats.clear()
+        data.experience.sort_keys = []
+
+    init_samples = np.mean([len(data.lp.outcomes[i]) for i in range(data.lp.num_tasks)])
+    task_success = np.mean([np.mean(data.lp.outcomes[i]) for i in range(data.lp.num_tasks)])
+    
+    print(f'Evaluated {steps_evaluated} steps. Score: {score}. TSR: {task_success}')
 
     scores.append(score)
     costs.append(cost)
