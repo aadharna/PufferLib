@@ -13,10 +13,10 @@ class BidirectionalLearningProgess:
         self.num_tasks = max_num_levels
         self.ema_alpha = ema_alpha
         self.p_theta = p_theta
-        self.n = num_active_tasks
+        self.n = int(num_active_tasks)
         self.rand_task_rate = rand_task_rate
         self.sample_threshold = sample_threshold
-        self.memory = memory
+        self.memory = int(memory)
         self.outcomes = {}
         for i in range(max_num_levels):
             self.outcomes[i] = []

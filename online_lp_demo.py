@@ -226,7 +226,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     score = stats[target_metric]
     
     prev_steps = 0
-    window = args['env']['num_maps'] // 200
+    window = args['env']['num_maps'] // 400
     loops = 0
     lps = []
     # reset the outcomes dict to get proper sampling for final eval
@@ -251,9 +251,8 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             # data.lp.collect_data(eval_infos)
 
         data.stats.clear()
-        data.experience.sort_keys = []
+        data.experience.sort_keys[:] = 0
 
-    init_samples = np.mean([len(data.lp.outcomes[i]) for i in range(data.lp.num_tasks)])
     task_success = np.mean([np.mean(data.lp.outcomes[i]) for i in range(data.lp.num_tasks)])
     
     print(f'Evaluated {steps_evaluated} steps. Score: {score}. TSR: {task_success}')
@@ -273,7 +272,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     timesteps = downsample_linear(timesteps, 10)
 
     if args['neptune']:
-        neptune['score'].append(score)
+        neptune['score'].append(task_success)
         neptune['cost'].append(cost)
     elif args['wandb']:
         wandb.log({'score': score, 'cost': cost})
