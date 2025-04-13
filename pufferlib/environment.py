@@ -80,6 +80,9 @@ class PufferEnv:
 
     def close(self):
         raise NotImplementedError
+    
+    def notify(self):
+        raise NotImplementedError
 
     def async_reset(self, seed=None):
         _, self.infos = self.reset(seed)

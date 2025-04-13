@@ -158,7 +158,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     wandb = None
     if args['neptune']:
         neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
-        neptune["sys/group_tags"].add(['dev_online_lp'])
+        neptune["sys/group_tags"].add(['env_online_lp'])
         for k, v in pufferlib.utils.unroll_nested_dict(args):
             neptune[k].append(v)
     elif args['wandb']:

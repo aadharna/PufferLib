@@ -149,13 +149,13 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
         )
 
     # breakpoint()
-    lp = BidirectionalLearningProgess(max_num_levels=config.num_maps,
-                                      ema_alpha=config.ema_alpha,
-                                      p_theta=config.p_theta,
-                                      num_active_tasks=config.num_active_tasks,
-                                      rand_task_rate=config.rand_task_rate,
-                                      sample_threshold=config.sample_threshold,
-                                      memory=config.memory)
+    # lp = BidirectionalLearningProgess(max_num_levels=config.num_maps,
+    #                                   ema_alpha=config.ema_alpha,
+    #                                   p_theta=config.p_theta,
+    #                                   num_active_tasks=config.num_active_tasks,
+    #                                   rand_task_rate=config.rand_task_rate,
+    #                                   sample_threshold=config.sample_threshold,
+    #                                   memory=config.memory)
 
     epochs = config.total_timesteps // config.batch_size
     assert config.scheduler in ('linear', 'cosine')
@@ -200,7 +200,7 @@ def create(config, vecenv, policy, optimizer=None, wandb=None, neptune=None):
         use_diayn=config.use_diayn,
         diayn_archive=config.diayn_archive,
         diayn_coef=config.diayn_coef,
-        lp=lp,
+        # lp=lp,
     )
 
 @pufferlib.utils.profile
@@ -326,14 +326,14 @@ def evaluate(data):
                 if config.device == 'cuda':
                     torch.cuda.synchronize()
 
-            new_infos = defaultdict(list)
+            # new_infos = defaultdict(list)
             with profile.eval_misc:
                 for i in info:
                     for k, v in pufferlib.utils.unroll_nested_dict(i):
                         infos[k].append(v)
-                        new_infos[k].append(v)
+                        # new_infos[k].append(v)
 
-            data.lp.collect_data(new_infos)
+            # data.vecenv.lp.collect_data(new_infos)
 
             with profile.env:
                 data.vecenv.send(actions)
@@ -365,26 +365,27 @@ def evaluate(data):
     data.experience.step = 0
     if data.epoch > 10:
         try:
-            lp_dist, levels = data.lp.calculate_dist()
-            data.vecenv.sampling_dist = lp_dist
-            data.vecenv.levels = levels
-            data.stats['mean_sample_prob'].append(np.mean(lp_dist)) 
-            data.stats['num_zeros_lp_dist'].append(np.sum(lp_dist == 0))
-            data.stats['task_1_success_rate'].append(data.lp.task_success_rate[0])
-            data.stats['task_500_success_rate'].append(data.lp.task_success_rate[499])
-            data.stats['last_task_success_rate'].append(data.lp.task_success_rate[-1])
-            data.stats['task_success_rate'].append(np.mean(data.lp.task_success_rate))
-            data.stats['mean_evals_per_task'].append(data.lp.mean_samples_per_eval[-1])
-            data.stats['num_nan_tasks'].append(data.lp.num_nans[-1])
+            data.vecenv.notify()
+            # lp_dist, levels = data.vecenv.lp.calculate_dist()
+            # data.vecenv.sampling_dist = lp_dist
+            # data.vecenv.levels = levels
+            data.stats['mean_sample_prob'].append(np.mean(data.vecenv.lp_dist)) 
+            data.stats['num_zeros_lp_dist'].append(np.sum(data.vecenv.lp_dist == 0))
+            data.stats['task_1_success_rate'].append(data.vecenv.lp.task_success_rate[0])
+            data.stats['task_500_success_rate'].append(data.vecenv.lp.task_success_rate[499])
+            data.stats['last_task_success_rate'].append(data.vecenv.lp.task_success_rate[-1])
+            data.stats['task_success_rate'].append(np.mean(data.vecenv.lp.task_success_rate))
+            data.stats['mean_evals_per_task'].append(data.vecenv.lp.mean_samples_per_eval[-1])
+            data.stats['num_nan_tasks'].append(data.vecenv.lp.num_nans[-1])
         except:
-            data.stats['mean_sample_prob'] = [np.mean(lp_dist)]
-            data.stats['num_zeros_lp_dist'] = [np.sum(lp_dist == 0)]
-            data.stats['task_1_success_rate'] = [data.lp.task_success_rate[0]]
-            data.stats['task_500_success_rate'] = [data.lp.task_success_rate[499]]
-            data.stats['last_task_success_rate'] = [data.lp.task_success_rate[-1]]
-            data.stats['task_success_rate'] = [np.mean(data.lp.task_success_rate)]
-            data.stats['mean_evals_per_task'] = [data.lp.mean_samples_per_eval[-1]]
-            data.stats['num_nan_tasks'] = [data.lp.num_nans[-1]]
+            data.stats['mean_sample_prob'] = [np.mean(data.vecenv.lp_dist)]
+            data.stats['num_zeros_lp_dist'] = [np.sum(data.vecenv.lp_dist == 0)]
+            data.stats['task_1_success_rate'] = [data.vecenv.lp.task_success_rate[0]]
+            data.stats['task_500_success_rate'] = [data.vecenv.lp.task_success_rate[499]]
+            data.stats['last_task_success_rate'] = [data.vecenv.lp.task_success_rate[-1]]
+            data.stats['task_success_rate'] = [np.mean(data.vecenv.lp.task_success_rate)]
+            data.stats['mean_evals_per_task'] = [data.vecenv.lp.mean_samples_per_eval[-1]]
+            data.stats['num_nan_tasks'] = [data.vecenv.lp.num_nans[-1]]
     return data.stats, infos
 
 @pufferlib.utils.profile
