@@ -230,8 +230,8 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     loops = 0
     lps = []
     # reset the outcomes dict to get proper sampling for final eval
-    data.lp.reset_outcomes()
-    while data.lp.continue_collecting():
+    data.vecenv.lp.reset_outcomes()
+    while data.vecenv.lp.continue_collecting():
         _sampling_dist = data.vecenv.sampling_dist
         sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
         sampling_dist[loops*window:(loops+1)*window] = 1 / window
@@ -244,16 +244,16 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         loops += 1
         while not all(data.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.lp.collecting:
             eval_stats, eval_infos = clean_pufferl.evaluate(data)
-            data.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.lp.outcomes.items()]
+            data.vecenv.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.vecenv.lp.outcomes.items()]
             # print(f'data collected on {sum(data.lp.task_sampled_tracker)} / {data.lp.num_tasks} tasks')
-            if sum(data.lp.task_sampled_tracker) == data.lp.num_tasks:
-                data.lp.collecting = False
+            if sum(data.vecenv.lp.task_sampled_tracker) == data.vecenv.lp.num_tasks:
+                data.vecenv.lp.collecting = False
             # data.lp.collect_data(eval_infos)
 
         data.stats.clear()
         data.experience.sort_keys[:] = 0
 
-    task_success = np.mean([np.mean(data.lp.outcomes[i]) for i in range(data.lp.num_tasks)])
+    task_success = np.mean([np.mean(data.vecenv.lp.outcomes[i]) for i in range(data.vecenv.lp.num_tasks)])
     
     print(f'Evaluated {steps_evaluated} steps. Score: {score}. TSR: {task_success}')
 

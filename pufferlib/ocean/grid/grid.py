@@ -82,7 +82,8 @@ class Grid(pufferlib.PufferEnv):
         self.c_envs.close()
 
     def notify(self):
-        self.lp_dist, self.levels = self.lp.calculate_dist()
+        self.sampling_dist, self.levels = self.lp.calculate_dist()
+        self.lp_dist = self.sampling_dist
 
 def test_performance(timeout=10, atn_cache=1024):
     env = CGrid(num_envs=1000)
