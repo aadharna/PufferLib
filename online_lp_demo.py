@@ -242,7 +242,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
         data.vecenv.levels = np.arange(loops*window, min((loops+1)*window, args['env']['num_maps'])).astype(np.int32)
         loops += 1
-        while not all(data.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.lp.collecting:
+        while not all(data.vecenv.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.vecenv.lp.collecting:
             eval_stats, eval_infos = clean_pufferl.evaluate(data)
             data.vecenv.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.vecenv.lp.outcomes.items()]
             # print(f'data collected on {sum(data.lp.task_sampled_tracker)} / {data.lp.num_tasks} tasks')
