@@ -86,7 +86,10 @@ class Serial:
                 actions=self.actions[ptr:end]
             )
             ptr = end
-            env = env_creators[i](*env_args[i], buf=buf_i, **env_kwargs[i])
+            try:
+                env = env_creators[i](*env_args[i], buf=buf_i, **env_kwargs[i])
+            except:
+                T()
             self.envs.append(env)
 
         self.driver_env = driver = self.envs[0]
@@ -165,6 +168,10 @@ class Serial:
     def close(self):
         for env in self.envs:
             env.close()
+
+    def notify(self):
+        for env in self.envs:
+            env.notify()
 
 def _worker_process(env_creators, env_args, env_kwargs, obs_shape, obs_dtype, atn_shape, atn_dtype,
         num_envs, num_agents, num_workers, worker_idx, send_pipe, recv_pipe, shm, is_native):

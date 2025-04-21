@@ -47,7 +47,7 @@ def init_neptune(args, name, id=None, resume=True, tag=None):
     import neptune
     workspace = args['workspace']
     run = neptune.init_run(
-        project="aadharna/Grid-LearningProgress",
+        project="aadharna/metta-LearningProgress",
         api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIzNTMzNTE0Zi1kOGNlLTQ4ZmUtYmI0Ny1iZTQ4NzQ2OTJhYmYifQ==",
         capture_hardware_metrics=False,
         capture_stdout=False,
@@ -158,7 +158,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     wandb = None
     if args['neptune']:
         neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
-        neptune["sys/group_tags"].add(['env_online_lp'])
+        neptune["sys/group_tags"].add(['lp'])
         for k, v in pufferlib.utils.unroll_nested_dict(args):
             neptune[k].append(v)
     elif args['wandb']:
@@ -225,37 +225,37 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     clean_pufferl.mean_and_log(data)
     score = stats[target_metric]
     
-    prev_steps = 0
-    window = args['env']['num_maps'] // 400
-    loops = 0
-    lps = []
+    # prev_steps = 0
+    # window = args['env']['num_maps'] // 400
+    # loops = 0
+    # lps = []
     # reset the outcomes dict to get proper sampling for final eval
-    data.vecenv.lp.reset_outcomes()
-    while data.vecenv.lp.continue_collecting():
-        _sampling_dist = data.vecenv.sampling_dist
-        sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-        sampling_dist[loops*window:(loops+1)*window] = 1 / window
-        # make sure the sampling distribution sums to 1
-        if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-            sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-            sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
-        data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
-        data.vecenv.levels = np.arange(loops*window, min((loops+1)*window, args['env']['num_maps'])).astype(np.int32)
-        loops += 1
-        while not all(data.vecenv.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.vecenv.lp.collecting:
-            eval_stats, eval_infos = clean_pufferl.evaluate(data)
-            data.vecenv.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.vecenv.lp.outcomes.items()]
-            # print(f'data collected on {sum(data.lp.task_sampled_tracker)} / {data.lp.num_tasks} tasks')
-            if sum(data.vecenv.lp.task_sampled_tracker) == data.vecenv.lp.num_tasks:
-                data.vecenv.lp.collecting = False
-            # data.lp.collect_data(eval_infos)
+    # data.vecenv.lp.reset_outcomes()
+    # while data.vecenv.lp.continue_collecting():
+    #     _sampling_dist = data.vecenv.sampling_dist
+    #     sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+    #     sampling_dist[loops*window:(loops+1)*window] = 1 / window
+    #     # make sure the sampling distribution sums to 1
+    #     if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
+    #         sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
+    #         sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
+    #     data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
+    #     data.vecenv.levels = np.arange(loops*window, min((loops+1)*window, args['env']['num_maps'])).astype(np.int32)
+    #     loops += 1
+    #     while not all(data.vecenv.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.vecenv.lp.collecting:
+    #         eval_stats, eval_infos = clean_pufferl.evaluate(data)
+    #         data.vecenv.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.vecenv.lp.outcomes.items()]
+    #         # print(f'data collected on {sum(data.lp.task_sampled_tracker)} / {data.lp.num_tasks} tasks')
+    #         if sum(data.vecenv.lp.task_sampled_tracker) == data.vecenv.lp.num_tasks:
+    #             data.vecenv.lp.collecting = False
+    #         # data.lp.collect_data(eval_infos)
 
-        data.stats.clear()
-        data.experience.sort_keys[:] = 0
+    #     data.stats.clear()
+    #     data.experience.sort_keys[:] = 0
 
-    task_success = np.mean([np.mean(data.vecenv.lp.outcomes[i]) for i in range(data.vecenv.lp.num_tasks)])
+    # task_success = np.mean([np.mean(data.vecenv.lp.outcomes[i]) for i in range(data.vecenv.lp.num_tasks)])
     
-    print(f'Evaluated {steps_evaluated} steps. Score: {score}. TSR: {task_success}')
+    print(f'Evaluated {steps_evaluated} steps. Score: {score}')
 
     scores.append(score)
     costs.append(cost)
@@ -272,7 +272,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     timesteps = downsample_linear(timesteps, 10)
 
     if args['neptune']:
-        neptune['score'].append(task_success)
+        neptune['score'].append(score)
         neptune['cost'].append(cost)
     elif args['wandb']:
         wandb.log({'score': score, 'cost': cost})
@@ -306,7 +306,7 @@ if __name__ == '__main__':
         ' demo options. Shows valid args for your env and policy',
         formatter_class=RichHelpFormatter, add_help=False)
     parser.add_argument('--env', '--environment', type=str,
-        default='puffer_grid', help='Name of specific environment to run')
+        default='metta', help='Name of specific environment to run')
     parser.add_argument('--mode', type=str, default='train',
         choices='train eval evaluate sweep autotune profile'.split())
     parser.add_argument('--vec-overwork', action='store_true',
