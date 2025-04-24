@@ -158,9 +158,9 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     wandb = None
     if args['neptune']:
         neptune = init_neptune(args, env_name, id=args['exp_id'], tag=args['tag'])
-        gtag = 'lp' if args['env']['use_lp'] else 'no_lp'
-        from pdb import set_trace as T
-        T()
+        gtag = 'lp_dev' if args['env']['use_lp'] else 'no_lp_dev'
+        # from pdb import set_trace as T
+        # T()
         neptune["sys/group_tags"].add([gtag])
         for k, v in pufferlib.utils.unroll_nested_dict(args):
             neptune[k].append(v)
@@ -215,7 +215,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
         if logs is not None and target_key in logs:
             timesteps.append(logs['agent_steps'])
             scores.append(logs[target_key])
-            costs.append(data.profile.uptime)
+            # costs.append(data.profile.uptime)
 
     steps_evaluated = 0
     cost = data.profile.uptime
