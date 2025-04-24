@@ -94,7 +94,7 @@ class MettaPuff(pufferlib.PufferEnv):
                 self.env.rewards)
 
             obs, infos = self.env._c_env.reset()
-            self.should_reset = False
+            self.env.should_reset = False
             self.tick = 0
             return obs, infos
         else:
