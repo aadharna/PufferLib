@@ -71,7 +71,7 @@ class MettaPuff(pufferlib.PufferEnv):
                         info['lp/mean_evals_per_task'] = self.lp.mean_samples_per_eval[-1]
                         info['lp/num_nan_tasks'] = self.lp.num_nans[-1]
             self.reset()
-            self.should_reset = True
+            self.env.should_reset = True
             if 'agent_raw' in info:
                 del info['agent_raw']
             if 'episode_rewards' in info:
