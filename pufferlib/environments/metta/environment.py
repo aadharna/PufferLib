@@ -58,7 +58,6 @@ class MettaPuff(pufferlib.PufferEnv):
         if all(term) or all(trunc):
             if self.use_lp:
                 self.lp.collect_data({f'tasks/{self._env_cfg_idx}': [info["episode/reward.mean"]]})
-                self.should_reset = True
                 if self.send_lp_metrics:
                     info[f'{self._env_cfg_idx}/reward.mean'] = info["episode/reward.mean"]
                     info['num_active_tasks'] = len(self.levels)
@@ -72,6 +71,7 @@ class MettaPuff(pufferlib.PufferEnv):
                         info['lp/mean_evals_per_task'] = self.lp.mean_samples_per_eval[-1]
                         info['lp/num_nan_tasks'] = self.lp.num_nans[-1]
             self.reset()
+            self.should_reset = True
             if 'agent_raw' in info:
                 del info['agent_raw']
             if 'episode_rewards' in info:
