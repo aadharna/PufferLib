@@ -325,7 +325,8 @@ def evaluate(data):
     data.ep_lengths.zero_()
     data.ep_uses.zero_()
     try:
-        data.vecenv.notify()
+        if data.epoch > 25:
+            data.vecenv.notify()
     except:
         pass
     profile.end()
