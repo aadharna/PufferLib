@@ -4,13 +4,16 @@ import numpy as np
 from collections import defaultdict
 
 import pufferlib
+from pufferlib.spaces import Discrete
 
 class BidirectionalLearningProgess:
-    def __init__(self, max_num_levels = 8192, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2,
+    def __init__(self, search_space, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2,
                  sample_threshold = 15, memory = 25):
         # try reducing ema_alpha more? do tuning sweep over that
         # also do the sweep on p_theta
-        self.num_tasks = max_num_levels
+        assert isinstance(search_space, Discrete), f"search_space must be a Discrete space, got {type(search_space)}"
+        self.search_space = search_space
+        self.num_tasks = max_num_levels = search_space.n
         self.ema_alpha = ema_alpha
         self.p_theta = p_theta
         self.n = int(num_active_tasks)
@@ -37,6 +40,17 @@ class BidirectionalLearningProgess:
         self.sample_levels = np.arange(max_num_levels).astype(np.int32)
         self.counter = {i: 0 for i in self.sample_levels}
 
+    def add_stats(self, info):
+        info['lp/num_active_tasks'] = len(self.sample_levels)
+        info['lp/mean_sample_prob'] = np.mean(self.task_dist)
+        info['lp/num_zeros_lp_dist'] = np.sum(self.task_dist == 0)
+        info['lp/task_1_success_rate'] = self.task_success_rate[0]
+        info[f'lp/task_{self.num_tasks // 2}_success_rate'] = self.task_success_rate[self.num_tasks // 2]
+        info['lp/last_task_success_rate'] = self.task_success_rate[-1]
+        info['lp/task_success_rate'] = np.mean(self.task_success_rate)
+        info['lp/mean_evals_per_task'] = self.mean_samples_per_eval[-1]
+        info['lp/num_nan_tasks'] = self.num_nans[-1]
+    
     def _update(self):
         task_success_rates = np.array([np.mean(self.outcomes[i]) for i in range(self.num_tasks)])
         update_mask = self.update_mask
