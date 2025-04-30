@@ -220,10 +220,10 @@ class LPEnvWrapper:
         self._env_cfg_idx = np.random.choice(self.all_levels)
         self.lp_metric = lp_metric
 
-        self.lp = BidirectionalLearningProgess(self.env.n, num_active_tasks=self.num_active_tasks,
-                                                  rand_task_rate=self.rand_task_rate,
-                                                  sample_threshold=self.sample_threshold,
-                                                  memory=self.memory)
+        self.lp = BidirectionalLearningProgess(search_space=self.n, num_active_tasks=self.num_active_tasks,
+                                                rand_task_rate=self.rand_task_rate,
+                                                sample_threshold=self.sample_threshold,
+                                                memory=self.memory)
         self.send_lp_metrics = False
     
     def step(self, actions):
