@@ -11,6 +11,8 @@ class BidirectionalLearningProgess:
                  sample_threshold = 15, memory = 25):
         # try reducing ema_alpha more? do tuning sweep over that
         # also do the sweep on p_theta
+        if isinstance(search_space, int):
+            search_space = Discrete(search_space)
         assert isinstance(search_space, Discrete), f"search_space must be a Discrete space, got {type(search_space)}"
         self.search_space = search_space
         self.num_tasks = max_num_levels = search_space.n

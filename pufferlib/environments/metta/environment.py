@@ -76,27 +76,27 @@ class MettaPuff(pufferlib.PufferEnv):
 
     def reset(self, seed=None):
         if self.use_lp:
+            #     levels = self.lp_levels
+            # else:
             levels = self.lp_levels
+            self._env_cfg_idx = np.random.choice(levels)
+            self.env._env_cfg = self.cfgs[self._env_cfg_idx]
+            self.env._reset_env()
+
+            self.env._c_env.set_buffers(
+                self.env.observations,
+                self.env.terminals,
+                self.env.truncations,
+                self.env.rewards)
+
+            obs, infos = self.env._c_env.reset()
+            self.env.should_reset = False
+            self.tick = 0
+            return obs, infos
         else:
-            levels = self.all_levels
-        self._env_cfg_idx = np.random.choice(levels)
-        self.env._env_cfg = self.cfgs[self._env_cfg_idx]
-        self.env._reset_env()
-
-        self.env._c_env.set_buffers(
-            self.env.observations,
-            self.env.terminals,
-            self.env.truncations,
-            self.env.rewards)
-
-        obs, infos = self.env._c_env.reset()
-        self.env.should_reset = False
-        self.tick = 0
-        return obs, infos
-        # else:
-        #     obs, _ = self.env.reset()
-        #     self.tick = 0
-        #     return obs, []
+            obs, _ = self.env.reset()
+            self.tick = 0
+            return obs, []
 
     def render(self):
         self.env.render()
