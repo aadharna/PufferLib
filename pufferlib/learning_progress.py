@@ -197,3 +197,74 @@ class BidirectionalLearningProgess:
         self.outcomes = {}
         for i in range(self.num_tasks):
             self.outcomes[i] = [] 
+
+
+class LPEnvWrapper:
+    def __init__(self, env, num_tasks, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.25, sample_threshold = 10, memory = 25, 
+                 use_lp = True, lp_metric='episode/reward.mean'):
+        self.env = env
+        self.n = num_tasks
+        self.use_lp = use_lp
+        self.ema_alpha = ema_alpha
+        self.p_theta = p_theta
+        self.num_active_tasks = num_active_tasks
+        self.rand_task_rate = rand_task_rate
+        self.sample_threshold = sample_threshold
+        self.memory = memory
+        self.lp_metric = lp_metric
+
+        self.cfgs = [self.env._get_new_env_cfg() for _ in range(self.n)]
+        self.all_levels = np.arange(self.n)
+        self.lp_levels = np.arange(self.n)
+        self.sampling_dist = np.ones(self.n) / self.n
+        self._env_cfg_idx = np.random.choice(self.all_levels)
+        self.lp_metric = lp_metric
+
+        self.lp = BidirectionalLearningProgess(self.env.n, num_active_tasks=self.num_active_tasks,
+                                                  rand_task_rate=self.rand_task_rate,
+                                                  sample_threshold=self.sample_threshold,
+                                                  memory=self.memory)
+        self.send_lp_metrics = False
+    
+    def step(self, actions):
+        obs, rew, term, trunc, info = self.env.step(actions)
+
+        if all(term) or all(trunc):
+            # alternate possability, send agent/heart.get
+            metric = self.lp_metric
+            self.lp.collect_data({f'tasks/{self._env_cfg_idx}': [info[metric]]})
+            if self.send_lp_metrics:
+                info[f'{self._env_cfg_idx}/{metric}'] = info[metric]
+                self.lp.add_stats(info)
+            self.env.reset()
+            self.env.should_reset = True
+            if 'agent_raw' in info:
+                del info['agent_raw']
+            if 'episode_rewards' in info:
+                info['score'] = info['episode_rewards']
+        else:
+            info = []
+
+        return obs, rew, term, trunc, [info]
+    
+    def reset(self, seed=None):
+        levels = self.lp_levels
+        self._env_cfg_idx = np.random.choice(levels)
+        self.env._env_cfg = self.cfgs[self._env_cfg_idx]
+        self.env._reset_env()
+
+        self.env._c_env.set_buffers(
+            self.env.observations,
+            self.env.terminals,
+            self.env.truncations,
+            self.env.rewards)
+
+        obs, infos = self.env._c_env.reset()
+        self.env.should_reset = False
+        self.tick = 0
+        return obs, infos
+
+    def notify(self):
+        self.sampling_dist, self.lp_levels = self.lp.calculate_dist()
+        self.lp_dist = self.sampling_dist
+        self.send_lp_metrics = True
