@@ -200,7 +200,8 @@ class BidirectionalLearningProgess:
 
 
 class LPEnvWrapper:
-    def __init__(self, env, num_tasks, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.25, sample_threshold = 10, memory = 25, 
+    def __init__(self, env, num_tasks, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, 
+                 rand_task_rate = 0.25, sample_threshold = 10, memory = 25, 
                  use_lp = True, lp_metric='episode/reward.mean'):
         self.env = env
         self.n = num_tasks
@@ -236,7 +237,7 @@ class LPEnvWrapper:
             if self.send_lp_metrics:
                 info[f'{self._env_cfg_idx}/{metric}'] = info[metric]
                 self.lp.add_stats(info)
-            self.env.reset()
+            self.reset()
             self.env.should_reset = True
             if 'agent_raw' in info:
                 del info['agent_raw']
@@ -248,8 +249,7 @@ class LPEnvWrapper:
         return obs, rew, term, trunc, [info]
     
     def reset(self, seed=None):
-        levels = self.lp_levels
-        self._env_cfg_idx = np.random.choice(levels)
+        self._env_cfg_idx = self.get_next_task_id()
         self.env._env_cfg = self.cfgs[self._env_cfg_idx]
         self.env._reset_env()
 
@@ -268,3 +268,10 @@ class LPEnvWrapper:
         self.sampling_dist, self.lp_levels = self.lp.calculate_dist()
         self.lp_dist = self.sampling_dist
         self.send_lp_metrics = True
+
+    def get_next_task_id(self):
+        return np.random.choice(self.lp_levels)
+    
+    def get_lp_dist(self):
+        return self.sampling_dist
+    
