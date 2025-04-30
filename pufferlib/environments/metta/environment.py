@@ -6,36 +6,33 @@ import numpy as np
 import pufferlib
 from mettagrid.gym_wrapper import RaylibRendererWrapper
 
-from pufferlib.learning_progress import BidirectionalLearningProgess
+from pufferlib.learning_progress import LPEnvWrapper
 
 def env_creator(name='metta'):
     return functools.partial(make, name)
 
-def make(name, config='pufferlib/environments/metta/dr_metta.yaml', render_mode='auto', buf=None, seed=0, num_maps = 64, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, 
-                 sample_threshold = 15, memory = 25, use_lp = True, lp_metric='episode/reward.mean'):
+def make(name, config='pufferlib/environments/metta/dr_metta.yaml', render_mode='auto', buf=None, seed=0, num_maps = 64, 
+         ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.25, 
+         sample_threshold = 10, memory = 25, use_lp = True, lp_metric='episode/reward.mean'):
     '''Crafter creation function'''
-    return MettaPuff(config, render_mode, buf, seed, num_maps, 
-                     ema_alpha, p_theta, num_active_tasks, rand_task_rate,
-                     sample_threshold, memory, use_lp, lp_metric='episode/reward.mean')
+    env = MettaPuff(config, render_mode, buf, seed)
+    if use_lp:
+        env = LPEnvWrapper(env=env, 
+                           num_tasks=num_maps, 
+                           num_active_tasks=num_active_tasks, 
+                           ema_alpha=ema_alpha, 
+                           p_theta=p_theta, 
+                           rand_task_rate=rand_task_rate, 
+                           sample_threshold=sample_threshold, 
+                           memory=memory, 
+                           lp_metric=lp_metric)
+    return env 
 
 class MettaPuff(pufferlib.PufferEnv):
-    def __init__(self, config, render_mode='human', buf=None, seed=0, num_maps = 64, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, 
-                 sample_threshold = 15, memory = 25, use_lp = True, lp_metric='episode/reward.mean'):
+    def __init__(self, config, render_mode='human', buf=None, seed=0):
         self.render_mode = render_mode
-        self.n = num_maps
-        self.use_lp = use_lp
         import mettagrid.mettagrid_env
         self.env = mettagrid.mettagrid_env.make_env_from_cfg(config, render_mode, buf=buf)
-        self.cfgs = [self.env._get_new_env_cfg() for _ in range(self.n)]
-        self.all_levels = np.arange(self.n)
-        self.lp_levels = np.arange(self.n)
-        self.lp_metric = lp_metric
-        
-        if self.use_lp:
-            self.lp = BidirectionalLearningProgess(self.n, ema_alpha, p_theta, 
-                                                num_active_tasks, rand_task_rate, 
-                                                sample_threshold, memory) 
-        self.send_lp_metrics = False
 
         if render_mode == 'human':
             from mettagrid.gym_wrapper import RaylibRendererWrapper
@@ -56,13 +53,13 @@ class MettaPuff(pufferlib.PufferEnv):
         obs, rew, term, trunc, info = self.env.step(actions)
 
         if all(term) or all(trunc):
-            if self.use_lp:
-                # alternate possability, send agent/heart.get
-                metric = self.lp_metric
-                self.lp.collect_data({f'tasks/{self._env_cfg_idx}': [info[metric]]})
-                if self.send_lp_metrics:
-                    info[f'{self._env_cfg_idx}/{metric}'] = info[metric]
-                    self.lp.add_stats(info)
+            # if self.use_lp:
+            #     # alternate possability, send agent/heart.get
+            #     metric = self.lp_metric
+            #     self.lp.collect_data({f'tasks/{self._env_cfg_idx}': [info[metric]]})
+            #     if self.send_lp_metrics:
+            #         info[f'{self._env_cfg_idx}/{metric}'] = info[metric]
+            #         self.lp.add_stats(info)
             self.reset()
             self.env.should_reset = True
             if 'agent_raw' in info:
@@ -75,28 +72,28 @@ class MettaPuff(pufferlib.PufferEnv):
         return obs, rew, term, trunc, [info]
 
     def reset(self, seed=None):
-        if self.use_lp:
-            #     levels = self.lp_levels
-            # else:
-            levels = self.lp_levels
-            self._env_cfg_idx = np.random.choice(levels)
-            self.env._env_cfg = self.cfgs[self._env_cfg_idx]
-            self.env._reset_env()
+        # if self.use_lp:
+        #     #     levels = self.lp_levels
+        #     # else:
+        #     levels = self.lp_levels
+        #     self._env_cfg_idx = np.random.choice(levels)
+        #     self.env._env_cfg = self.cfgs[self._env_cfg_idx]
+        #     self.env._reset_env()
 
-            self.env._c_env.set_buffers(
-                self.env.observations,
-                self.env.terminals,
-                self.env.truncations,
-                self.env.rewards)
+        #     self.env._c_env.set_buffers(
+        #         self.env.observations,
+        #         self.env.terminals,
+        #         self.env.truncations,
+        #         self.env.rewards)
 
-            obs, infos = self.env._c_env.reset()
-            self.env.should_reset = False
-            self.tick = 0
-            return obs, infos
-        else:
-            obs, _ = self.env.reset()
-            self.tick = 0
-            return obs, []
+        #     obs, infos = self.env._c_env.reset()
+        #     self.env.should_reset = False
+        #     self.tick = 0
+        #     return obs, infos
+        # else:
+        obs, _ = self.env.reset()
+        self.tick = 0
+        return obs, []
 
     def render(self):
         self.env.render()
@@ -105,7 +102,4 @@ class MettaPuff(pufferlib.PufferEnv):
         self.env.close()
 
     def notify(self):
-        if self.use_lp:
-            self.sampling_dist, self.lp_levels = self.lp.calculate_dist()
-            self.lp_dist = self.sampling_dist
-            self.send_lp_metrics = True
+        pass
