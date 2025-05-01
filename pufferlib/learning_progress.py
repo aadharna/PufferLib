@@ -200,6 +200,8 @@ class BidirectionalLearningProgess:
 
 
 class LPEnvWrapper:
+    """Note, this wrapper probably needs some other helper methods that
+    simply pass along the call to the env"""
     def __init__(self, env, num_tasks, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, 
                  rand_task_rate = 0.25, sample_threshold = 10, memory = 25, 
                  use_lp = True, lp_metric='episode/reward.mean'):
