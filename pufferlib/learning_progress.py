@@ -276,4 +276,10 @@ class LPEnvWrapper:
     
     def get_lp_dist(self):
         return self.sampling_dist
+
+    def render(self):
+        return self.env.render()
+    
+    def close(self):
+        return self.env.close()
     
