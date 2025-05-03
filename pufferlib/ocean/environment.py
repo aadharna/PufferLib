@@ -49,12 +49,12 @@ def make_puffer(width=1080, height=720, num_agents=4096, horizon=512,
 
 def make_puffergrid(render_mode='raylib', vision_range=5,
         num_envs=4096, num_maps=1000, max_map_size=9,
-        report_interval=128, buf=None, max_num_levels = 4096, 
+        report_interval=128, buf=None, seed=0, max_num_levels = 4096, 
         ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, 
         rand_task_rate = 0.2, sample_threshold = 15, memory = 25):
     breakpoint()
     return PufferGrid(render_mode, vision_range, num_envs,
-        num_maps, max_map_size, report_interval, buf, max_num_levels, ema_alpha, p_theta, num_active_tasks, rand_task_rate, 
+        num_maps, max_map_size, report_interval, buf, seed, max_num_levels, ema_alpha, p_theta, num_active_tasks, rand_task_rate, 
                  sample_threshold, memory)
 
 def make_continuous(discretize=False, buf=None, **kwargs):

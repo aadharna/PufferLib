@@ -13,7 +13,7 @@ from pufferlib.learning_progress import BidirectionalLearningProgess
 class Grid(pufferlib.PufferEnv):
     def __init__(self, render_mode='raylib', vision_range=5,
             num_sims=4096, num_maps=1000, map_size=-1, max_map_size=9,
-            report_interval=128, buf=None, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, 
+            report_interval=128, buf=None, seed = 0, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2, 
                  sample_threshold = 15, memory = 25):
         # breakpoint()
         self.obs_size = 2*vision_range + 1
