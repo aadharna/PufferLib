@@ -220,43 +220,25 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
     steps_evaluated = 0
     cost = data.uptime
     batch_size = args['train']['batch_size']
-    while len(data.stats[target_metric]) < min_eval_points:
-        stats, _ = clean_pufferl.evaluate(data)
+    # create new data object to get unbiased eval data
+    eval_vecenv = pufferlib.vector.make(
+        make_env,
+        env_kwargs=args['env'],
+        num_envs=args['train']['num_envs'],
+        num_workers=args['train']['num_workers'],
+        batch_size=args['train']['env_batch_size'],
+        zero_copy=args['train']['zero_copy'],
+        overwork=args['vec_overwork'],
+        backend=vec,
+    )
+    eval_data = clean_pufferl.create(train_config, eval_vecenv, policy, wandb=wandb, neptune=neptune)
+    while len(eval_data.stats[target_metric]) < min_eval_points:
+        stats, _ = clean_pufferl.evaluate(eval_data)
         # data.experience.sort_keys[:] = 0
         steps_evaluated += batch_size
 
-    clean_pufferl.mean_and_log(data)
+    clean_pufferl.mean_and_log(eval_data)
     score = stats[target_metric]
-
-    # prev_steps = 0
-    # window = args['env']['num_maps'] // 400
-    # loops = 0
-    # lps = []
-    # reset the outcomes dict to get proper sampling for final eval
-    # data.vecenv.lp.reset_outcomes()
-    # while data.vecenv.lp.continue_collecting():
-    #     _sampling_dist = data.vecenv.sampling_dist
-    #     sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-    #     sampling_dist[loops*window:(loops+1)*window] = 1 / window
-    #     # make sure the sampling distribution sums to 1
-    #     if sum(sampling_dist) < 1 and (loops+1)*window > args['env']['num_maps']:
-    #         sampling_dist = np.zeros_like(_sampling_dist).astype(np.float32)
-    #         sampling_dist[loops*window:(loops+1)*window] = 1 / (sampling_dist[loops*window:].shape[0])
-    #     data.vecenv.sampling_dist = sampling_dist.astype(np.float32)
-    #     data.vecenv.levels = np.arange(loops*window, min((loops+1)*window, args['env']['num_maps'])).astype(np.int32)
-    #     loops += 1
-    #     while not all(data.vecenv.lp.task_sampled_tracker[(loops-1)*window:loops*window]) and data.vecenv.lp.collecting:
-    #         eval_stats, eval_infos = clean_pufferl.evaluate(data)
-    #         data.vecenv.lp.task_sampled_tracker = [int(bool(o)) for k, o in data.vecenv.lp.outcomes.items()]
-    #         # print(f'data collected on {sum(data.lp.task_sampled_tracker)} / {data.lp.num_tasks} tasks')
-    #         if sum(data.vecenv.lp.task_sampled_tracker) == data.vecenv.lp.num_tasks:
-    #             data.vecenv.lp.collecting = False
-    #         # data.lp.collect_data(eval_infos)
-
-    #     data.stats.clear()
-    #     data.experience.sort_keys[:] = 0
-
-    # task_success = np.mean([np.mean(data.vecenv.lp.outcomes[i]) for i in range(data.vecenv.lp.num_tasks)])
 
     print(f'Evaluated {steps_evaluated} steps. Score: {score}')
 
@@ -292,6 +274,7 @@ def train(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=10
             wandb.log({'environment/elo': elos[model_name]})
     '''
     clean_pufferl.close(data)
+    clean_pufferl.close(eval_data)
     return scores, costs, timesteps, elos, vecenv
 
 def train_ddp(rank, world_size, args, make_env, policy_cls, rnn_cls, target_metric):
