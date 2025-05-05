@@ -4,7 +4,7 @@ import numpy as np
 from collections import defaultdict
 
 import pufferlib
-from pufferlib.spaces import Discrete
+from gymnasium.spaces import Discrete
 
 class BidirectionalLearningProgess:
     def __init__(self, search_space, ema_alpha = 0.001, p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.2,
@@ -229,6 +229,13 @@ class LPEnvWrapper:
                                                 sample_threshold=self.sample_threshold,
                                                 memory=self.memory)
         self.send_lp_metrics = False
+
+        # additional stuff we need that puffer expects at the top level of the env
+        self.single_observation_space = self.env.single_observation_space
+        self.single_action_space = self.env.single_action_space
+        self.num_agents = self.env.num_agents
+        self.render_mode = self.env.render_mode
+        self.tick = 0
     
     def step(self, actions):
         obs, rew, term, trunc, info = self.env.step(actions)
