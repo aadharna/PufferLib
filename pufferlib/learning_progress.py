@@ -236,6 +236,7 @@ class LPEnvWrapper:
         self.num_agents = self.env.num_agents
         self.render_mode = self.env.render_mode
         self.tick = 0
+        self.emulated = self.env.emulated
     
     def step(self, actions):
         obs, rew, term, trunc, info = self.env.step(actions)
