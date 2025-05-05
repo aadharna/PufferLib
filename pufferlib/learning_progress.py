@@ -206,6 +206,7 @@ class LPEnvWrapper:
                  rand_task_rate = 0.25, sample_threshold = 10, memory = 25, 
                  use_lp = True, lp_metric='episode/reward.mean'):
         self.env = env
+        self.raw_env = env.env
         self.n = num_tasks
         self.use_lp = use_lp
         self.ema_alpha = ema_alpha
@@ -216,7 +217,7 @@ class LPEnvWrapper:
         self.memory = memory
         self.lp_metric = lp_metric
 
-        self.cfgs = [self.env._get_new_env_cfg() for _ in range(self.n)]
+        self.cfgs = [self.raw_env._get_new_env_cfg() for _ in range(self.n)]
         self.all_levels = np.arange(self.n)
         self.lp_levels = np.arange(self.n)
         self.sampling_dist = np.ones(self.n) / self.n
@@ -252,17 +253,17 @@ class LPEnvWrapper:
     
     def reset(self, seed=None):
         self._env_cfg_idx = self.get_next_task_id()
-        self.env._env_cfg = self.cfgs[self._env_cfg_idx]
-        self.env._reset_env()
+        self.raw_env._env_cfg = self.cfgs[self._env_cfg_idx]
+        self.raw_env._reset_env()
 
-        self.env._c_env.set_buffers(
-            self.env.observations,
-            self.env.terminals,
-            self.env.truncations,
-            self.env.rewards)
+        self.raw_env._c_env.set_buffers(
+            self.raw_env.observations,
+            self.raw_env.terminals,
+            self.raw_env.truncations,
+            self.raw_env.rewards)
 
-        obs, infos = self.env._c_env.reset()
-        self.env.should_reset = False
+        obs, infos = self.raw_env._c_env.reset()
+        self.raw_env.should_reset = False
         self.tick = 0
         return obs, infos
 
