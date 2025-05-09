@@ -182,6 +182,8 @@ class CleanPuffeRL:
         self.wandb = wandb
         if neptune:
             self.neptune = init_neptune(args, env_name, id=config.run_id, tag=config.tag)
+            gtag = 'lp_rel' if args['env']['use_lp'] else 'no_lp_rel'
+            neptune["sys/group_tags"].add([gtag])
             for k, v in pufferlib.unroll_nested_dict(args):
                 self.neptune[k].append(v)
         elif wandb:
@@ -281,6 +283,11 @@ class CleanPuffeRL:
         self.ep_indices = torch.arange(self.total_agents, device=config.device, dtype=torch.int32)
         self.ep_lengths.zero_()
         self.ep_uses.zero_()
+        try:
+            if self.epoch > 25:
+                self.vecenv.notify()
+        except:
+            pass
         profile.end()
         return self.stats
 
@@ -922,14 +929,14 @@ def init_neptune(args, name, id=None, resume=True, tag=None, mode="async"):
         neptune_name = args['neptune_name']
         neptune_project = args['neptune_project']
         run = neptune.init_run(
-            project=f"{neptune_name}/{neptune_project}",
+            project="aadharna/metta-LearningProgress",
+            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIzNTMzNTE0Zi1kOGNlLTQ4ZmUtYmI0Ny1iZTQ4NzQ2OTJhYmYifQ==",
             capture_hardware_metrics=False,
             capture_stdout=False,
             capture_stderr=False,
             capture_traceback=False,
             tags=[tag] if tag is not None else [],
-            mode=mode,
-        )
+    )
     except neptune.exceptions.NeptuneConnectionLostException:
         print("couldn't connect to neptune, logging in offline mode")
         return init_neptune(args, name, id, resume, tag, mode="offline")
