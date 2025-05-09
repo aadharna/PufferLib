@@ -325,6 +325,11 @@ def evaluate(data):
     data.ep_indices = torch.arange(data.total_agents, device=config.device, dtype=torch.int32)
     data.ep_lengths.zero_()
     data.ep_uses.zero_()
+    try:
+        if data.epoch > 25:
+            data.vecenv.notify()
+    except:
+        pass
     profile.end()
     return data.stats, infos
 
