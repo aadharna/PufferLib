@@ -11,7 +11,7 @@ from pufferlib.learning_progress import BidirectionalLearningProgess
 def env_creator(name='metta'):
     return functools.partial(make, name)
 
-def make(name, config='pufferlib/environments/metta/dr_metta.yaml', render_mode='auto', buf=None, seed=0, num_maps = 64, ema_alpha = 0.001, 
+def make(name, config='pufferlib/environments/metta/metta_mines.yaml', render_mode='auto', buf=None, seed=0, num_maps = 64, ema_alpha = 0.001, 
          p_theta = 0.05, num_active_tasks = 16, rand_task_rate = 0.25,
          sample_threshold = 10, memory = 25, use_lp = True, lp_metric='episode/reward.mean'):
     '''Crafter creation function'''
@@ -81,29 +81,29 @@ class MettaPuff(pufferlib.PufferEnv):
         # else:
         #     levels = self.all_levels
             self._env_cfg_idx = np.random.choice(levels)
-            self.env._env_cfg = self.cfgs[self._env_cfg_idx]
-            self.env._reset_env()
+            self.env.env._env_cfg = self.cfgs[self._env_cfg_idx]
+            self.env.env._reset_env()
 
-            self.env._c_env.set_buffers(
-            self.env.observations,
-            self.env.terminals,
-            self.env.truncations,
-            self.env.rewards)
+            self.env.env._c_env.set_buffers(
+            self.env.env.observations,
+            self.env.env.terminals,
+            self.env.env.truncations,
+            self.env.env.rewards)
 
-            obs, infos = self.env._c_env.reset()
-            self.env.should_reset = False
+            obs, infos = self.env.env._c_env.reset()
+            self.env.env.should_reset = False
             self.tick = 0
             return obs, infos
         else:
-            obs, _ = self.env.reset()
+            obs, _ = self.env.env.reset()
             self.tick = 0
             return obs, []
 
     def render(self):
-        self.env.render()
+        self.env.env.render()
 
     def close(self):
-        self.env.close()
+        self.env.env.close()
 
     def notify(self):
         if self.use_lp:

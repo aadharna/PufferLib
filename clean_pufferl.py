@@ -125,7 +125,7 @@ class CleanPuffeRL:
 
         self.accumulate_minibatches = max(1, config.minibatch_size // config.max_minibatch_size)
         self.total_minibatches = int(config.update_epochs * batch_size / self.minibatch_size)
-        self.minibatch_segments = self.minibatch_size // horizon 
+        self.minibatch_segments = self.minibatch_size // horizon
         if self.minibatch_segments * horizon != self.minibatch_size:
             raise pufferlib.APIUsageError(
                 f'minibatch_size {self.minibatch_size} must be divisible by horizon {horizon}'
@@ -182,8 +182,9 @@ class CleanPuffeRL:
         self.wandb = wandb
         if neptune:
             self.neptune = init_neptune(args, env_name, id=config.run_id, tag=config.tag)
-            gtag = 'lp_rel' if args['env']['use_lp'] else 'no_lp_rel'
-            neptune["sys/group_tags"].add([gtag])
+            # breakpoint()
+            gtag = 'lp_mines' if args['env']['use_lp'] else 'no_lp_mines'
+            self.neptune["sys/group_tags"].add([gtag])
             for k, v in pufferlib.unroll_nested_dict(args):
                 self.neptune[k].append(v)
         elif wandb:
@@ -284,7 +285,7 @@ class CleanPuffeRL:
         self.ep_lengths.zero_()
         self.ep_uses.zero_()
         try:
-            if self.epoch > 25:
+            if self.epoch > 250:
                 self.vecenv.notify()
         except:
             pass
@@ -638,7 +639,7 @@ class CleanPuffeRL:
             f'{c1}DRAM: {b2}{dram_percent:.1f}{c2}%',
             f'{c1}VRAM: {b2}{vram_percent:.1f}{c2}%',
         )
-            
+
         s = Table(box=None, expand=True)
         SPS = 0
         delta = profile.eval.delta + profile.train.delta
@@ -930,7 +931,7 @@ def init_neptune(args, name, id=None, resume=True, tag=None, mode="async"):
         neptune_project = args['neptune_project']
         run = neptune.init_run(
             project="aadharna/metta-LearningProgress",
-            api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiIzNTMzNTE0Zi1kOGNlLTQ4ZmUtYmI0Ny1iZTQ4NzQ2OTJhYmYifQ==",
+            api_token="",
             capture_hardware_metrics=False,
             capture_stdout=False,
             capture_stderr=False,
@@ -956,7 +957,7 @@ def downsample_linear(arr, m):
     x_old = np.linspace(0, 1, n)  # Original indices normalized
     x_new = np.linspace(0, 1, m)  # New indices normalized
     return np.interp(x_new, x_old, arr)
- 
+
 def sweep(args, env_name, make_env, policy_cls, rnn_cls):
     if not args['wandb'] and not args['neptune']:
         raise pufferlib.APIUsageError('Sweeps require either wandb or neptune')
@@ -979,7 +980,7 @@ def sweep(args, env_name, make_env, policy_cls, rnn_cls):
         if args['train']['minibatch_size'] >= args['train']['batch_size']:
             sweep.observe(args, 0.0, 0.0)
             continue
-        
+
         scores, costs, timesteps = train_wrap(args, make_env, policy_cls, rnn_cls, target_metric)
         scores = downsample_linear(scores, 10)
         costs = downsample_linear(costs, 10)
@@ -996,7 +997,18 @@ def sweep(args, env_name, make_env, policy_cls, rnn_cls):
         print('Score:', score, 'Cost:', cost, 'Timesteps:', timestep)
 
 def train_wrap(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_points=100, wandb=None, neptune=None):
+    # breakpoint()
+    if args['env']['use_lp'] in ['True', 'true', 1, True]:
+        args['env']['use_lp'] = True
+    else:
+        args['env']['use_lp'] = False
+    args['train']['total_timesteps'] = int(args['train']['total_timesteps'])
     vecenv = pufferlib.vector.make(make_env, env_kwargs=args['env'], **args['vec'])
+    eval_env_args = copy.deepcopy(args['env'])
+    eval_env_args['use_lp'] = False
+    # eval on harder case
+    eval_env_args['config'] = 'pufferlib/environments/metta/metta.yaml'
+    eval_vecenv = pufferlib.vector.make(make_env, env_kwargs=eval_env_args, **args['vec'])
     policy = make_policy(vecenv.driver_env, policy_cls, rnn_cls, args)
     args['train']['use_rnn'] = rnn_cls is not None
 
@@ -1034,6 +1046,8 @@ def train_wrap(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_poin
     cost = time.time() - pufferl.start_time
     batch_size = args['train']['batch_size']
     timesteps.append(pufferl.global_step)
+    eval_vecenv.async_reset(train_config.seed)
+    pufferl.vecenv = eval_vecenv
     while len(pufferl.stats[target_metric]) < min_eval_points:
         stats = pufferl.evaluate()
         steps_evaluated += batch_size
@@ -1045,6 +1059,7 @@ def train_wrap(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_poin
     scores.append(score)
     costs.append(cost)
 
+    vecenv.close()
     pufferl.close()
     return scores, costs, timesteps
 
@@ -1053,6 +1068,7 @@ def train_wrap(args, make_env, policy_cls, rnn_cls, target_metric, min_eval_poin
 #@record
 
 if __name__ == '__main__':
+    import copy
     parser = argparse.ArgumentParser(
         description=f':blowfish: PufferLib [bright_cyan]{pufferlib.__version__}[/]'
         ' demo options. Shows valid args for your env and policy',
@@ -1128,7 +1144,7 @@ if __name__ == '__main__':
     env_module = importlib.import_module(module_name)
     make_env = env_module.env_creator(env_name)
     policy_cls = getattr(env_module.torch, args['policy_name'])
-    
+
     rnn_name = args['rnn_name']
     rnn_cls = None
     if rnn_name is not None:
